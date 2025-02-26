@@ -1,0 +1,86 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.12.35527.113 d17.12
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gedcom", "Gedcom\Gedcom.csproj", "{872AE81C-2178-4D2B-9077-34A8AD1595D9}"
+	ProjectSection(ProjectDependencies) = postProject
+		{C006EBC3-3802-430C-914D-ED54AC81DE98} = {C006EBC3-3802-430C-914D-ED54AC81DE98}
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Utility", "Utility\Utility.csproj", "{C006EBC3-3802-430C-914D-ED54AC81DE98}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GedcomParser", "GedcomParser\GedcomParser.csproj", "{1CACB4ED-A0AC-49B0-BFCF-3EBA26DF558C}"
+	ProjectSection(ProjectDependencies) = postProject
+		{872AE81C-2178-4D2B-9077-34A8AD1595D9} = {872AE81C-2178-4D2B-9077-34A8AD1595D9}
+		{C006EBC3-3802-430C-914D-ED54AC81DE98} = {C006EBC3-3802-430C-914D-ED54AC81DE98}
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gedcom.Reports", "Gedcom.Reports\Gedcom.Reports.csproj", "{67BD6594-7528-4185-B660-90DF29153671}"
+	ProjectSection(ProjectDependencies) = postProject
+		{872AE81C-2178-4D2B-9077-34A8AD1595D9} = {872AE81C-2178-4D2B-9077-34A8AD1595D9}
+		{C006EBC3-3802-430C-914D-ED54AC81DE98} = {C006EBC3-3802-430C-914D-ED54AC81DE98}
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GedcomFetcher", "GedcomFetcher\GedcomFetcher.csproj", "{5E567797-F15F-4EAF-93CD-AF4A90FF3CA9}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug - VS|Any CPU = Debug - VS|Any CPU
+		Debug|Any CPU = Debug|Any CPU
+		Release - VS|Any CPU = Release - VS|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{872AE81C-2178-4D2B-9077-34A8AD1595D9}.Debug - VS|Any CPU.ActiveCfg = Debug - VS|Any CPU
+		{872AE81C-2178-4D2B-9077-34A8AD1595D9}.Debug - VS|Any CPU.Build.0 = Debug - VS|Any CPU
+		{872AE81C-2178-4D2B-9077-34A8AD1595D9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{872AE81C-2178-4D2B-9077-34A8AD1595D9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{872AE81C-2178-4D2B-9077-34A8AD1595D9}.Release - VS|Any CPU.ActiveCfg = Release - VS|Any CPU
+		{872AE81C-2178-4D2B-9077-34A8AD1595D9}.Release - VS|Any CPU.Build.0 = Release - VS|Any CPU
+		{872AE81C-2178-4D2B-9077-34A8AD1595D9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{872AE81C-2178-4D2B-9077-34A8AD1595D9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C006EBC3-3802-430C-914D-ED54AC81DE98}.Debug - VS|Any CPU.ActiveCfg = Debug - VS|Any CPU
+		{C006EBC3-3802-430C-914D-ED54AC81DE98}.Debug - VS|Any CPU.Build.0 = Debug - VS|Any CPU
+		{C006EBC3-3802-430C-914D-ED54AC81DE98}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C006EBC3-3802-430C-914D-ED54AC81DE98}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C006EBC3-3802-430C-914D-ED54AC81DE98}.Release - VS|Any CPU.ActiveCfg = Release - VS|Any CPU
+		{C006EBC3-3802-430C-914D-ED54AC81DE98}.Release - VS|Any CPU.Build.0 = Release - VS|Any CPU
+		{C006EBC3-3802-430C-914D-ED54AC81DE98}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C006EBC3-3802-430C-914D-ED54AC81DE98}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1CACB4ED-A0AC-49B0-BFCF-3EBA26DF558C}.Debug - VS|Any CPU.ActiveCfg = Debug - VS|Any CPU
+		{1CACB4ED-A0AC-49B0-BFCF-3EBA26DF558C}.Debug - VS|Any CPU.Build.0 = Debug - VS|Any CPU
+		{1CACB4ED-A0AC-49B0-BFCF-3EBA26DF558C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1CACB4ED-A0AC-49B0-BFCF-3EBA26DF558C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1CACB4ED-A0AC-49B0-BFCF-3EBA26DF558C}.Release - VS|Any CPU.ActiveCfg = Release - VS|Any CPU
+		{1CACB4ED-A0AC-49B0-BFCF-3EBA26DF558C}.Release - VS|Any CPU.Build.0 = Release - VS|Any CPU
+		{1CACB4ED-A0AC-49B0-BFCF-3EBA26DF558C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1CACB4ED-A0AC-49B0-BFCF-3EBA26DF558C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{67BD6594-7528-4185-B660-90DF29153671}.Debug - VS|Any CPU.ActiveCfg = Debug - VS|Any CPU
+		{67BD6594-7528-4185-B660-90DF29153671}.Debug - VS|Any CPU.Build.0 = Debug - VS|Any CPU
+		{67BD6594-7528-4185-B660-90DF29153671}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{67BD6594-7528-4185-B660-90DF29153671}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{67BD6594-7528-4185-B660-90DF29153671}.Release - VS|Any CPU.ActiveCfg = Release - VS|Any CPU
+		{67BD6594-7528-4185-B660-90DF29153671}.Release - VS|Any CPU.Build.0 = Release - VS|Any CPU
+		{67BD6594-7528-4185-B660-90DF29153671}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{67BD6594-7528-4185-B660-90DF29153671}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5E567797-F15F-4EAF-93CD-AF4A90FF3CA9}.Debug - VS|Any CPU.ActiveCfg = Debug - VS|Any CPU
+		{5E567797-F15F-4EAF-93CD-AF4A90FF3CA9}.Debug - VS|Any CPU.Build.0 = Debug - VS|Any CPU
+		{5E567797-F15F-4EAF-93CD-AF4A90FF3CA9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5E567797-F15F-4EAF-93CD-AF4A90FF3CA9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5E567797-F15F-4EAF-93CD-AF4A90FF3CA9}.Release - VS|Any CPU.ActiveCfg = Release - VS|Any CPU
+		{5E567797-F15F-4EAF-93CD-AF4A90FF3CA9}.Release - VS|Any CPU.Build.0 = Release - VS|Any CPU
+		{5E567797-F15F-4EAF-93CD-AF4A90FF3CA9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5E567797-F15F-4EAF-93CD-AF4A90FF3CA9}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(MonoDevelopProperties) = preSolution
+		name = Gedcom.NET
+		version = 0.6
+		StartupItem = Gedcom.UI\Gedcom.UI.GTK\Gedcom.UI.GTK.csproj
+		MonoDevelop.ChangeLogAddIn.ChangeLogInfo = $0
+		$0.policy = UpdateNearestChangeLog
+	EndGlobalSection
+EndGlobal

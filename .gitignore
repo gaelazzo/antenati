@@ -1,0 +1,12 @@
+# Esclude le cartelle bin e obj in qualsiasi sottodirectory
+**/bin/
+**/obj/
+
+# Esclude la cartella .vs (cache di Visual Studio)
+.vs/
+
+# Esclude la cartella packages (pacchetti NuGet)
+packages/
+
+# Esclude la cartella publish (output di pubblicazione)
+publish/
