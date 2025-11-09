@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -159,9 +159,11 @@ namespace viewer {
 
             // Pattern per catturare la `div` con classe `facet-modal-anni_is`
             string pattern = @"data-facet-term=""tipologia_ss:(?:&quot;)?([^""]+?)(?:&quot;)?""";
+			//string pattern = @"data-facet-term=""tipologia_ss:([^""]+)""";			
 
 
-            foreach (Match match in Regex.Matches(htmlContent, pattern,RegexOptions.Singleline)) {
+
+			foreach (Match match in Regex.Matches(htmlContent, pattern,RegexOptions.Singleline)) {
                 var tipo = match.Groups[1].Value;
                 if (annoSerieKindById.ContainsKey(AnnoSerieKind.objectKey( annoSerie.idSerie, annoSerie.anno, tipo)))
                     continue; //errore nella pagina, saltiamo il duplicato

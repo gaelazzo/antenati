@@ -34,7 +34,16 @@ namespace viewer {
             
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new Viewer());
+            try
+			{
+                Application.Run(new Viewer());
+            }
+            catch (Exception e)
+			{
+                MessageBox.Show(e.ToString(), "Error");
+
+            }
+            
             GC.KeepAlive(mutex);
 
         }

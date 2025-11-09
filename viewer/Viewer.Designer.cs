@@ -1,4 +1,4 @@
-﻿namespace viewer {
+namespace viewer {
     partial class Viewer {
         /// <summary>
         /// Required designer variable.
@@ -205,6 +205,7 @@
             this.btnAnnoPrima = new System.Windows.Forms.Button();
             this.btnAnnoDopo = new System.Windows.Forms.Button();
             this.btnRotateReg = new System.Windows.Forms.Button();
+            this.chkSerial = new System.Windows.Forms.CheckBox();
             ((System.ComponentModel.ISupportInitialize)(this.pic)).BeginInit();
             this.imgPanel.SuspendLayout();
             this.contextMenuStrip1.SuspendLayout();
@@ -1403,7 +1404,7 @@
             // chkEnableKey
             // 
             this.chkEnableKey.AutoSize = true;
-            this.chkEnableKey.Location = new System.Drawing.Point(816, 34);
+            this.chkEnableKey.Location = new System.Drawing.Point(816, 26);
             this.chkEnableKey.Name = "chkEnableKey";
             this.chkEnableKey.Size = new System.Drawing.Size(68, 17);
             this.chkEnableKey.TabIndex = 21;
@@ -2080,11 +2081,22 @@
             this.btnRotateReg.UseVisualStyleBackColor = false;
             this.btnRotateReg.Click += new System.EventHandler(this.btnRotateReg_Click);
             // 
+            // chkSerial
+            // 
+            this.chkSerial.AutoSize = true;
+            this.chkSerial.Location = new System.Drawing.Point(816, 41);
+            this.chkSerial.Name = "chkSerial";
+            this.chkSerial.Size = new System.Drawing.Size(81, 17);
+            this.chkSerial.TabIndex = 60;
+            this.chkSerial.Text = "Serial mode";
+            this.chkSerial.UseVisualStyleBackColor = true;
+            // 
             // Viewer
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1908, 988);
+            this.Controls.Add(this.chkSerial);
             this.Controls.Add(this.btnRotateReg);
             this.Controls.Add(this.btnAnnoDopo);
             this.Controls.Add(this.btnAnnoPrima);
@@ -2349,6 +2361,7 @@
         private System.Windows.Forms.Label label28;
         private System.Windows.Forms.TextBox txtLongFam;
         private System.Windows.Forms.CheckBox chkFullKey;
-    }
+		private System.Windows.Forms.CheckBox chkSerial;
+	}
 }
 

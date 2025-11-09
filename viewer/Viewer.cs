@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -55,10 +55,16 @@ namespace viewer {
             }
         }
         string getImageUrlByCode(string code) {
-            return "https://iiif-antenati.cultura.gov.it/iiif/2/" + code + "/full/full/0/default.jpg";
-        }
+            int width = mapWidth[code];
+			// {scheme}://{server}/iiif/2/{identifier}/{region}/{size}/{rotation}/{quality}.{format}
+			//return "https://iiif-antenati.cultura.gov.it/iiif/2/" + code + "/full/full/0/default.jpg";
+			// https://iiif-antenati.cultura.gov.it/iiif/2/5VrBEzV/0,2048,1024,518/1024,/0/default.jpg
 
-        void removeRequest(string code) {
+			return $"https://iiif-antenati.cultura.gov.it/iiif/2/{code}/full/{width},/0/default.jpg";
+
+		}
+
+		void removeRequest(string code) {
             lock (hashSemaphore) {
                 if (existingRequests.Contains(PathFromCode(code)))
                     existingRequests.Remove(PathFromCode(code));
@@ -133,10 +139,14 @@ namespace viewer {
 
         public Viewer() {
             InitializeComponent();
+			PageLoader.getResponseMessage("https://antenati.cultura.gov.it/");
+            PageLoader.getResponseMessage("https://analytics-icar.cultura.gov.it/matomo.js");
+			PageLoader.getResponseMessage("https://www.googletagmanager.com/gtag/js?id=G-HPLTCJ58MW");
+			PageLoader.getResponseMessage("https://antenati.cultura.gov.it/ark:/12657/an_ua244110/LPbBpOd/");
+			
 
 
-
-            statusLabel = new ToolStripStatusLabel("Pronto");
+			statusLabel = new ToolStripStatusLabel("Pronto");
             statusStrip.Items.Add(statusLabel);
 
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Ssl3 | SecurityProtocolType.Tls | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
@@ -333,12 +343,14 @@ namespace viewer {
         private System.Drawing.Image lastImage = null;
 
         private Dictionary<int, string> mapPage = new Dictionary<int, string>();
-        private Dictionary<string, int> pageDecode = new Dictionary<string, int>();
+        private Dictionary<string, int> mapWidth = new Dictionary<string, int>();
+		private Dictionary<string, int> pageDecode = new Dictionary<string, int>();
 
         void clearMaps() {
             mapPage.Clear();
             pageDecode.Clear();
-        }
+            mapWidth.Clear();
+		}
 
 
 
@@ -404,8 +416,8 @@ namespace viewer {
         }
 
         string loadJpg(string code) {
-            var imgUrl = getImageUrlByCode(code);
-            return loadImage(imgUrl);
+			var imgUrl = getImageUrlByCode(code);
+			return loadImage(imgUrl);
 
         }
 
@@ -671,7 +683,8 @@ namespace viewer {
             currManifest = null;
             pageDecode = new Dictionary<string, int>();
             mapPage = new Dictionary<int, string>();
-        }
+            mapWidth = new Dictionary<string, int>();
+		}
         void setTotPages() {
             txtTotPages.Text = "";
 
@@ -720,8 +733,9 @@ namespace viewer {
             currManifest = r.manifest;
             pageDecode = currManifest.pageDecode;
             mapPage = currManifest.mapPage;
+            mapWidth = currManifest.pageWidth;
 
-            setTotPages();
+			setTotPages();
 
             TreeNode tn = RegNode.addArchiveNodeToTree(r, treeMain.Nodes);
             currentImage = 0;
@@ -768,6 +782,9 @@ namespace viewer {
         }
 
         private void btnPiuUno_Click(object sender, EventArgs e) {
+            if (chkSerial.Checked && txtPageNum.Text != txtEffettivo.Text) {
+                return;
+            }
             int step = calcStep();
             setNum(getNum() + step);
 
@@ -1243,10 +1260,57 @@ namespace viewer {
 
                 if (!forced)
                     Sdownload.WaitOne();
-                w = new WebClient();
-                string url = getImageUrlByCode(code);
-                currExploring = url;
-                w.DownloadFile(url, fileName);
+
+
+                string url =getImageUrlByCode(code);  //  "https://iiif-antenati.cultura.gov.it/iiif/2/LPbBpOd/full/956,/0/default.jpg"
+				currExploring = url;
+
+				Dictionary<string, string> cookies = new Dictionary<string, string>();
+    //            var _ga = PageLoader.getCookie("_ga");  //GA1.1.1208148208.1762619312
+				//var _gid = PageLoader.getCookie("_ga_HPLTCJ58MW");
+
+    //            if (_ga == null) {
+    //                return false;
+    //            }
+				//Console.WriteLine("Reading address " + url);
+				//cookies.Add("_ga", _ga);
+				//cookies.Add("_ga_HPLTCJ58MW", _gid);  //GS2.1.s1762619311$o1$g1$t1762622216$j58$l0$h0
+				cookies.Add("_ga", "GA1.1.1208148208.1762619312");
+				cookies.Add("_ga_HPLTCJ58MW", "GS2.1.s1762676767$o4$g1$t1762676853$j59$l0$h0");  //GS2.1.s1762619311$o1$g1$t1762622216$j58$l0$h0
+
+
+				Dictionary<string, string> headers = new Dictionary<string, string>();
+				//headers.Add("Accept", "*/*");
+				//headers.Add("Accept-Encoding", "gzip, deflate, br, zstd");
+				//headers.Add("Accept-Language", "it,en-US;q=0.9,en;q=0.8");
+				//headers.Add("Origin", "https://antenati.cultura.gov.it");
+				//headers.Add("Priority", "u=1, i");
+				headers.Add("Referer", "https://antenati.cultura.gov.it");
+
+				headers.Add("Sec-Ch-Ua", @"""Chromium"";v=""142"", ""Google Chrome"";v=""142"", ""Not?A_Brand"";v=""99""");
+				headers.Add("Sec-Ch-Ua-Mobile", "?0");
+				headers.Add("Sec-Ch-Ua-Platform", "\"Windows\"");
+				headers.Add("Sec-Fetch-Dest", "empty");
+				headers.Add("Sec-Fetch-Mode", "cors");
+				headers.Add("Sec-Fetch-Site", "same-site");
+				headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36");
+
+
+				
+
+				var response = PageLoader.getResponseMessage(url, HttpCompletionOption.ResponseContentRead, headers, cookies);
+
+				if (response == null || !response.IsSuccessStatusCode) {
+					Console.WriteLine($"HTTP Error {(int?)response?.StatusCode}: {response?.ReasonPhrase}");
+					return false;
+				}
+				using (var fs = new FileStream(fileName, FileMode.Create, FileAccess.Write)) {
+					using (var stream = response.Content.ReadAsStreamAsync().Result) {
+						stream.CopyTo(fs);
+					}
+				}
+
+				
                 var f = new FileInfo(fileName);
                 if (f.Length > 10000) {
                     System.IO.File.Copy(fileName, path);
@@ -1258,7 +1322,9 @@ namespace viewer {
             }
             catch (Exception e) {
                 string eee = e.ToString();
-            }
+                
+				Console.WriteLine("queueDownloadFile:"+e.Message);
+			}
             finally {
                 if (!forced)
                     Sdownload.Release();
@@ -1443,7 +1509,11 @@ namespace viewer {
                     }
 
                     if (pieces[0] == "winSize") {
-                        this.Size = new Size(Convert.ToInt32(pieces[1]), Convert.ToInt32(pieces[2]));
+                        int xx = Convert.ToInt32(pieces[1]);
+                        if (xx < 100) xx = 100;
+                        int yy = Convert.ToInt32(pieces[2]);
+                        if (yy < 100) yy = 100;
+                        this.Size = new Size(xx, yy);
                         //this.splitContainer1.Size= new Size(Convert.ToInt32(pieces[1])-28, Convert.ToInt32(pieces[2])-31);
                     }
                     if (pieces[0] == "split") {
@@ -1453,6 +1523,7 @@ namespace viewer {
 
                     if (pieces[0] == "xPos") {
                         x = toIntOrDefault(pieces[1]);
+                        if (x < 0) x = 100;
                     }
                     if (pieces[0] == "bitly") {
                         bitlyCode = pieces[1];
@@ -1465,6 +1536,7 @@ namespace viewer {
 
                     if (pieces[0] == "yPos") {
                         y = toIntOrDefault(pieces[1]);
+                        if (y < 0) y = 100;
                         this.StartPosition = FormStartPosition.Manual;
                         this.Location = new Point(x, y);
                         //this.splitContainer1.Size= new Size(Convert.ToInt32(pieces[1])-28, Convert.ToInt32(pieces[2])-31);
@@ -2105,14 +2177,17 @@ namespace viewer {
 
             int step = calcStep();
             bool ctrl = e.Control;
-            if (e.KeyCode == Keys.Left) {
-                setNum(getNum() - step);
-                chkEnableKey.Select();
-            }
+            if (!chkSerial.Checked || txtPageNum.Text == txtEffettivo.Text){
+                if (e.KeyCode == Keys.Left){
+                    setNum(getNum() - step);
+                    chkEnableKey.Select();
+                }
 
-            if (e.KeyCode == Keys.Right) {
-                setNum(getNum() + step);
-                chkEnableKey.Select();
+                if (e.KeyCode == Keys.Right){
+                    setNum(getNum() + step);
+                    chkEnableKey.Select();
+                }
+
             }
 
         }
@@ -4311,11 +4386,12 @@ namespace viewer {
         private void fullKey_CheckedChanged(object sender, EventArgs e) {
             longSearch();
         }
-    }
+        
+	}
 
 
 
-    public class RegistryExtractor {
+	public class RegistryExtractor {
         private static readonly HttpClient client = new HttpClient();
 
         public static async Task ExtractRegistryInfo(string url) {

@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -23,16 +23,18 @@ namespace viewer {
         public string Anno { get; set; }
         public string tipologia { get; set; }
 
-        public Dictionary<int, string> mapPage { get; set; }
+		public Dictionary<int, string> mapPage { get; set; }
         [JsonIgnore]
         public Dictionary<string, int> pageDecode { get; set; }
 
-        /// <summary>
-        /// Dalla stringa del contesto archivistico estrae il nome del comune
-        /// </summary>
-        /// <param name="contesto">es.  //"Archivio di Stato di Bari > Stato civile italiano > Carbonara"</param>
-        /// <returns>in questo caso Carbonara</returns>
-        private static string GetComuneFromContestoArchivistico(string contesto) {
+		public Dictionary<string, int> pageWidth {get; set;}
+
+		/// <summary>
+		/// Dalla stringa del contesto archivistico estrae il nome del comune
+		/// </summary>
+		/// <param name="contesto">es.  //"Archivio di Stato di Bari > Stato civile italiano > Carbonara"</param>
+		/// <returns>in questo caso Carbonara</returns>
+		private static string GetComuneFromContestoArchivistico(string contesto) {
             // "value": "Archivio di Stato di Napoli > Stato civile della restaurazione (quartieri di Napoli) > Arenella"
             // Estrapola il comune, che dovrebbe essere l'ultimo elemento separato da " > ", in questo caso Arenella
             if (contesto != null) {
@@ -93,9 +95,10 @@ namespace viewer {
             }                
             Dictionary<int, string> mapPage = new Dictionary<int, string>();
             Dictionary<string, int> pageDecode = new Dictionary<string, int>();
+            Dictionary<string, int> pageWidth= new Dictionary<string, int>();
 
-            // Naviga verso l'array "canvases" all'interno di "sequences"
-            var canvases = manifestJson["sequences"]?[0]?["canvases"];
+			// Naviga verso l'array "canvases" all'interno di "sequences"
+			var canvases = manifestJson["sequences"]?[0]?["canvases"];
 
             Manifest m = new Manifest();
             if (canvases != null) {
@@ -106,23 +109,27 @@ namespace viewer {
                     string idImage = (string)canvas["@id"];
                     var pieces = idImage.Split('/');
 
-                    var idRegistro =pieces[5];
+                    //m.width = canvas["width"]?.ToString();
+                    //m.height = canvas["height"]?.ToString();
+
+					var idRegistro =pieces[5];
                     m.idRegistro = idRegistro.Substring(5);
                     var imageCode = pieces[6];
 
                     mapPage[pageNumber] = imageCode;
                     pageDecode[imageCode] = pageNumber;
+                    pageWidth[imageCode] = (int)(canvas["width"] ?? 1000);
 
-                    //// Estrai il numero della pagina (label) e il codice URL
-                    //string urlCode = (string)canvas["images"]?[0]?["resource"]?["@id"];
+					//// Estrai il numero della pagina (label) e il codice URL
+					//string urlCode = (string)canvas["images"]?[0]?["resource"]?["@id"];
 
-                    //if (urlCode != null) {
-                    //    // Estrai il codice dall'URL
-                    //    string code = urlCode.Split('/')[5];
-                    //    mapPage[pageNumber] = code;
-                    //    pageDecode[code] = pageNumber;
-                    //}
-                }
+					//if (urlCode != null) {
+					//    // Estrai il codice dall'URL
+					//    string code = urlCode.Split('/')[5];
+					//    mapPage[pageNumber] = code;
+					//    pageDecode[code] = pageNumber;
+					//}
+				}
             }
 
             var metadata = manifestJson["metadata"] as JArray;            
@@ -133,8 +140,9 @@ namespace viewer {
             m.Anno = GetMetadataValue(metadata, "Titolo");
             m.tipologia = GetMetadataValue(metadata, "Tipologia");
             m.mapPage = mapPage;
+            m.pageWidth = pageWidth;
 
-            string jsonData = JsonConvert.SerializeObject(m, Formatting.Indented);
+			string jsonData = JsonConvert.SerializeObject(m, Formatting.Indented);
             File.WriteAllText(filename, jsonData);
             m.pageDecode = pageDecode;
             allManifest[manifestId] = m;
@@ -194,16 +202,19 @@ namespace viewer {
                 headers.Add("Priority", "u=1, i");
                 headers.Add("Referer", "https://antenati.cultura.gov.it");
 
-                headers.Add("Sec-Ch-Ua", @"""Chromium"";v=""130"", ""Google Chrome"";v=""130"", ""Not?A_Brand"";v=""99""");
+                headers.Add("Sec-Ch-Ua", @"""Chromium"";v=""142"", ""Google Chrome"";v=""142"", ""Not?A_Brand"";v=""99""");
                 headers.Add("Sec-Ch-Ua-Mobile", "?0");
                 headers.Add("Sec-Ch-Ua-Platform", "\"Windows\"");
                 headers.Add("Sec-Fetch-Dest", "empty");
                 headers.Add("Sec-Fetch-Mode", "cors");
                 headers.Add("Sec-Fetch-Site", "same-site");
-                headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36");
+                headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36");
 
-                // Effettua una richiesta GET per ottenere il JSON
-                HttpResponseMessage response = PageLoader.getResponseMessage(url,HttpCompletionOption.ResponseContentRead, headers, cookies);
+				
+
+
+				// Effettua una richiesta GET per ottenere il JSON
+				HttpResponseMessage response = PageLoader.getResponseMessage(url,HttpCompletionOption.ResponseContentRead, headers, cookies);
                 response.EnsureSuccessStatusCode(); // Lancia un'eccezione se lo stato non è 200 OK
 
                 // Legge il contenuto della risposta come stringa
