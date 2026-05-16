@@ -1,15 +1,16 @@
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
-using System.Net.Http;
-using System.Text.RegularExpressions;
 using System.IO;
-using Newtonsoft.Json;
+using System.Linq;
 using System.Net;
-using System.Text;
+using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Security.Policy;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace viewer {
@@ -71,7 +72,19 @@ namespace viewer {
             return Path.Combine("manifest", manifestId + ".json");
         }
         static Dictionary<string, Manifest> allManifest = new Dictionary<string, Manifest>();
-        public static async Task<Manifest> LoadManifest(string manifestId) {
+
+		async Task GetAllImageSizesAsync(IEnumerable<string> ids) {
+			var tasks = ids.Select(ManifestLoader.LoadInfoJsonAsync);
+			var results = await Task.WhenAll(tasks);
+            foreach (var r in results) {
+				Console.WriteLine($"{r.idImage}: {r.width}x{r.height}");
+                pageWidth[r.idImage] = r.width;
+
+			}
+				
+		}
+
+		public static async Task<Manifest> LoadManifest(string manifestId) {
             if (allManifest.ContainsKey(manifestId)) {
                 return allManifest[manifestId];
             }
@@ -99,15 +112,17 @@ namespace viewer {
 
 			// Naviga verso l'array "canvases" all'interno di "sequences"
 			var canvases = manifestJson["sequences"]?[0]?["canvases"];
-
-            Manifest m = new Manifest();
+            List<string> imageIds = new List<string>();
+			Manifest m = new Manifest();
             if (canvases != null) {
                 int pageNumber = 0;
                 foreach (var canvas in canvases) {
                     pageNumber += 1;
                     //Estrae il codice del registro an_uaXXXXXXX
                     string idImage = (string)canvas["@id"];
-                    var pieces = idImage.Split('/');
+                    
+
+					var pieces = idImage.Split('/');
 
                     //m.width = canvas["width"]?.ToString();
                     //m.height = canvas["height"]?.ToString();
@@ -117,7 +132,8 @@ namespace viewer {
                     var imageCode = pieces[6];
 
                     mapPage[pageNumber] = imageCode;
-                    pageDecode[imageCode] = pageNumber;
+					imageIds.Add(imageCode);
+					pageDecode[imageCode] = pageNumber;
                     pageWidth[imageCode] = (int)(canvas["width"] ?? 1000);
 
 					//// Estrai il numero della pagina (label) e il codice URL
@@ -142,6 +158,7 @@ namespace viewer {
             m.mapPage = mapPage;
             m.pageWidth = pageWidth;
 
+            //await m.GetAllImageSizesAsync(imageIds);
 			string jsonData = JsonConvert.SerializeObject(m, Formatting.Indented);
             File.WriteAllText(filename, jsonData);
             m.pageDecode = pageDecode;
@@ -196,7 +213,7 @@ namespace viewer {
                 //headers.Add( ":path", $"/antenati/containers/{manifestId}/manifest");
                 //headers.Add(":scheme", "https");
                 headers.Add("Accept", "*/*");
-                headers.Add("Accept-Encoding", "gzip, deflate, br, zstd");
+                headers.Add("Accept-Encoding", "gzip, deflate");
                 headers.Add("Accept-Language", "it,en-US;q=0.9,en;q=0.8");
                 headers.Add("Origin", "https://antenati.cultura.gov.it");
                 headers.Add("Priority", "u=1, i");
@@ -208,7 +225,7 @@ namespace viewer {
                 headers.Add("Sec-Fetch-Dest", "empty");
                 headers.Add("Sec-Fetch-Mode", "cors");
                 headers.Add("Sec-Fetch-Site", "same-site");
-                headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36");
+                //headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36");
 
 				
 
@@ -216,6 +233,8 @@ namespace viewer {
 				// Effettua una richiesta GET per ottenere il JSON
 				HttpResponseMessage response = PageLoader.getResponseMessage(url,HttpCompletionOption.ResponseContentRead, headers, cookies);
                 response.EnsureSuccessStatusCode(); // Lancia un'eccezione se lo stato non è 200 OK
+
+                Console.WriteLine(response.Content.Headers.ContentEncoding.FirstOrDefault());
 
                 // Legge il contenuto della risposta come stringa
                 string jsonContent = await response.Content.ReadAsStringAsync();
@@ -233,6 +252,76 @@ namespace viewer {
                 return null;
             }
         }
-    }
+
+		public class IiifInfo {
+            public string idImage { get; set; }
+			public int width {
+				get; set;
+			}
+			public int height {
+				get; set;
+			}
+		}
+		public static async Task<IiifInfo> LoadInfoJsonAsync(string idImage) {
+			// Costruisce l'URL del manifest del registro  
+			string url = $"https://iiif-antenati.cultura.gov.it/iiif/2/{idImage}/info.json";
+
+
+			//https://dam-antenati.cultura.gov.it/antenati/containers/wrrkrG8/manifest
+
+			try {
+				Dictionary<string, string> cookies = new Dictionary<string, string>();
+				cookies.Add("PHPSESSID", PageLoader.getCookie("PHPSESSID"));
+				cookies.Add("path", "/");
+
+				Dictionary<string, string> headers = new Dictionary<string, string>();
+				//headers.Add(":authority", "dam-antenati.cultura.gov.it");
+				//headers.Add(":method", "GET");
+				//headers.Add( ":path", $"/antenati/containers/{manifestId}/manifest");
+				//headers.Add(":scheme", "https");
+				headers.Add("Accept", "*/*");
+                headers.Add("Accept-Encoding", "gzip, deflate");
+                headers.Add("Accept-Language", "it,en-US;q=0.9,en;q=0.8");
+				headers.Add("Origin", "https://antenati.cultura.gov.it");
+				headers.Add("Priority", "u=1, i");
+				headers.Add("Referer", "https://antenati.cultura.gov.it");
+
+				headers.Add("Sec-Ch-Ua", @"""Chromium"";v=""142"", ""Google Chrome"";v=""142"", ""Not?A_Brand"";v=""99""");
+				headers.Add("Sec-Ch-Ua-Mobile", "?0");
+				headers.Add("Sec-Ch-Ua-Platform", "\"Windows\"");
+				headers.Add("Sec-Fetch-Dest", "empty");
+				headers.Add("Sec-Fetch-Mode", "cors");
+				headers.Add("Sec-Fetch-Site", "same-site");
+				//headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36");
+
+
+
+
+				// Effettua una richiesta GET per ottenere il JSON
+				HttpResponseMessage response = PageLoader.getResponseMessage(url, HttpCompletionOption.ResponseContentRead, headers, cookies);
+				response.EnsureSuccessStatusCode(); // Lancia un'eccezione se lo stato non è 200 OK
+
+				// Legge il contenuto della risposta come stringa
+				string jsonContent = await response.Content.ReadAsStringAsync();
+
+				// Converte la stringa JSON in un oggetto JObject
+				JObject registroJson = JObject.Parse(jsonContent);
+				return new IiifInfo() {
+					idImage= idImage,
+                    width= registroJson["width"]?.Value<int>() ?? 0,
+                    height= registroJson["height"]?.Value<int>() ?? 0
+				};
+			}
+			catch (HttpRequestException e) {
+				MessageBox.Show($"Errore nella richiesta HTTP ({url}): {e.Message}", "Errore");
+				return null;
+			}
+			catch (Exception e) {
+				MessageBox.Show($"Errore generico nella richiesta HTTP ({url}): {e.Message}", "Errore");
+				return null;
+			}
+		}
+
+	}
 
 }

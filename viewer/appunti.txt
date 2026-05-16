@@ -1,0 +1,36 @@
+    string iiifBaseUrl = "https://iiif-antenati.cultura.gov.it/iiif/2";
+
+		string BuildIiifUrl( string code, int desiredWidth) {
+			return $"{iiifBaseUrl}/{code}/full/{desiredWidth},/0/default.jpg";
+		}
+		async Task<Image> LoadImageAsync( string code) {
+			if (!pageDecode.ContainsKey(code))
+				return null;
+
+			string url = BuildIiifUrl(iiifBaseUrl, code, pic.Width * zoom / 1000);
+
+			using (var response = await httpClient.GetAsync(url)) {
+				response.EnsureSuccessStatusCode();
+				using (var stream = await response.Content.ReadAsStreamAsync()) {
+					return Image.FromStream(stream);
+				}
+			}
+		}
+		ConcurrentDictionary<string, Task<Image>> cache = new ConcurrentDictionary<string, Task<Image>>();
+
+		async Task ViewImageAsync(int n) {
+			if (n == 0 || !mapPage.ContainsKey(n))
+				return;
+
+			string code = mapPage[n];
+			var img = await LoadImageAsync(code);
+
+			if (img == null)
+				return;
+
+			if (chkContrast.Checked)
+				processImage((Bitmap)img, contrastBar.Value);
+
+			displayImage(img);
+			pic.Refresh();
+		}

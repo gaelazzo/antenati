@@ -47,8 +47,6 @@ namespace Gedcom
 		
 		private GedcomRecordList<string> _SubmitterRecords;
 		
-		// FIXME
-		private object _LDSSpouseSealings; 
 
 		private MarriageStartStatus _startStatus;
 		

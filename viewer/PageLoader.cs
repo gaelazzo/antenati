@@ -30,8 +30,12 @@ namespace viewer {
 			HttpClientHandler handler = new HttpClientHandler() {
 				UseCookies = true,
 				AllowAutoRedirect = true,
-				CookieContainer = cookieContainer
-			};
+				CookieContainer = cookieContainer,
+                AutomaticDecompression =
+                            DecompressionMethods.GZip |
+                            DecompressionMethods.Deflate  //|DecompressionMethods.Brotli
+            };
+        
 			//handler.CookieContainer.Add(uri, new Cookie("_ga", "GA1.1.1181240017.1762626745"));
 			//handler.CookieContainer.Add(uri, new Cookie("_ga_HPLTCJ58MW", "GS2.1.s1762626745$o1$g1$t1762627271$j55$l0$h0"));
 
@@ -45,9 +49,7 @@ namespace viewer {
 				
 				// User-Agent obbligatorio
 				client.DefaultRequestHeaders.UserAgent.ParseAdd(
-					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
-					"AppleWebKit/537.36 (KHTML, like Gecko) " +
-					"Chrome/142.0.0.0 Safari/537.36"
+					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
 				);
 				
 				if (headers != null) {
@@ -58,8 +60,10 @@ namespace viewer {
                 try {
                     var response = client.GetAsync(url,opt).Result;
 
+                    Console.WriteLine(response.Content.Headers.ContentEncoding.FirstOrDefault());
+
                     // Estrai i cookie per il dominio richiesto
-                   
+
                     var responseCookies = cookieContainer.GetCookies(uri);
 
                     foreach (Cookie cookie in responseCookies) {

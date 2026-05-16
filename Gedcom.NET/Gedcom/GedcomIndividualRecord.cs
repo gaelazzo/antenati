@@ -42,8 +42,7 @@ namespace Gedcom
 		private GedcomRecordList<GedcomIndividualEvent> _Events;
 		private GedcomRecordList<GedcomIndividualEvent> _Attributes;
 		
-		// FIXME
-		private object _LDSIndividualOrdinances;
+	
 		
 		private GedcomRecordList<GedcomFamilyLink> _ChildIn;
 		private GedcomRecordList<GedcomFamilyLink> _SpouseIn;

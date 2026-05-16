@@ -278,7 +278,7 @@ namespace viewer {
             this.imgPanel.Controls.Add(this.pic);
             this.imgPanel.Location = new System.Drawing.Point(3, 3);
             this.imgPanel.Name = "imgPanel";
-            this.imgPanel.Size = new System.Drawing.Size(1396, 858);
+            this.imgPanel.Size = new System.Drawing.Size(1265, 858);
             this.imgPanel.TabIndex = 4;
             // 
             // contextMenuStrip1
@@ -297,84 +297,84 @@ namespace viewer {
             this.impostaIndiceInternoToolStripMenuItem,
             this.vaiARegistroToolStripMenuItem});
             this.contextMenuStrip1.Name = "contextMenuStrip1";
-            this.contextMenuStrip1.Size = new System.Drawing.Size(198, 220);
+            this.contextMenuStrip1.Size = new System.Drawing.Size(222, 238);
             this.contextMenuStrip1.Opening += new System.ComponentModel.CancelEventHandler(this.contextMenuStrip1_Opening);
             // 
             // saveToolStripMenuItem
             // 
             this.saveToolStripMenuItem.Name = "saveToolStripMenuItem";
-            this.saveToolStripMenuItem.Size = new System.Drawing.Size(197, 22);
+            this.saveToolStripMenuItem.Size = new System.Drawing.Size(221, 24);
             this.saveToolStripMenuItem.Text = "Save image to file";
             this.saveToolStripMenuItem.Click += new System.EventHandler(this.saveToolStripMenuItem_Click);
             // 
             // toolStripSeparator1
             // 
             this.toolStripSeparator1.Name = "toolStripSeparator1";
-            this.toolStripSeparator1.Size = new System.Drawing.Size(194, 6);
+            this.toolStripSeparator1.Size = new System.Drawing.Size(218, 6);
             // 
             // toolStripMenuItem1
             // 
             this.toolStripMenuItem1.Name = "toolStripMenuItem1";
-            this.toolStripMenuItem1.Size = new System.Drawing.Size(197, 22);
+            this.toolStripMenuItem1.Size = new System.Drawing.Size(221, 24);
             this.toolStripMenuItem1.Text = "Shorten Url";
             this.toolStripMenuItem1.Click += new System.EventHandler(this.toolStripMenuItem1_Click);
             // 
             // shortenUrlToolStripMenuItem
             // 
             this.shortenUrlToolStripMenuItem.Name = "shortenUrlToolStripMenuItem";
-            this.shortenUrlToolStripMenuItem.Size = new System.Drawing.Size(197, 22);
+            this.shortenUrlToolStripMenuItem.Size = new System.Drawing.Size(221, 24);
             this.shortenUrlToolStripMenuItem.Text = "Shorten Image Url";
             this.shortenUrlToolStripMenuItem.Click += new System.EventHandler(this.shortenUrlToolStripMenuItem_Click);
             // 
             // toolStripMenuItem2
             // 
             this.toolStripMenuItem2.Name = "toolStripMenuItem2";
-            this.toolStripMenuItem2.Size = new System.Drawing.Size(197, 22);
+            this.toolStripMenuItem2.Size = new System.Drawing.Size(221, 24);
             this.toolStripMenuItem2.Text = "crea riferimento";
             this.toolStripMenuItem2.Click += new System.EventHandler(this.toolStripMenuItem2_Click);
             // 
             // toolStripSeparator2
             // 
             this.toolStripSeparator2.Name = "toolStripSeparator2";
-            this.toolStripSeparator2.Size = new System.Drawing.Size(194, 6);
+            this.toolStripSeparator2.Size = new System.Drawing.Size(218, 6);
             // 
             // openInBrowserToolStripMenuItem
             // 
             this.openInBrowserToolStripMenuItem.Name = "openInBrowserToolStripMenuItem";
-            this.openInBrowserToolStripMenuItem.Size = new System.Drawing.Size(197, 22);
+            this.openInBrowserToolStripMenuItem.Size = new System.Drawing.Size(221, 24);
             this.openInBrowserToolStripMenuItem.Text = "Open image in browser";
             this.openInBrowserToolStripMenuItem.Click += new System.EventHandler(this.openInBrowserToolStripMenuItem_Click);
             // 
             // openUrlInBrowserToolStripMenuItem
             // 
             this.openUrlInBrowserToolStripMenuItem.Name = "openUrlInBrowserToolStripMenuItem";
-            this.openUrlInBrowserToolStripMenuItem.Size = new System.Drawing.Size(197, 22);
+            this.openUrlInBrowserToolStripMenuItem.Size = new System.Drawing.Size(221, 24);
             this.openUrlInBrowserToolStripMenuItem.Text = "Open url in browser";
             this.openUrlInBrowserToolStripMenuItem.Click += new System.EventHandler(this.openUrlInBrowserToolStripMenuItem_Click);
             // 
             // toolStripSeparator3
             // 
             this.toolStripSeparator3.Name = "toolStripSeparator3";
-            this.toolStripSeparator3.Size = new System.Drawing.Size(194, 6);
+            this.toolStripSeparator3.Size = new System.Drawing.Size(218, 6);
             // 
             // vaiAIndiceToolStripMenuItem
             // 
             this.vaiAIndiceToolStripMenuItem.Name = "vaiAIndiceToolStripMenuItem";
-            this.vaiAIndiceToolStripMenuItem.Size = new System.Drawing.Size(197, 22);
+            this.vaiAIndiceToolStripMenuItem.Size = new System.Drawing.Size(221, 24);
             this.vaiAIndiceToolStripMenuItem.Text = "vai a indice";
             this.vaiAIndiceToolStripMenuItem.Click += new System.EventHandler(this.vaiAIndiceToolStripMenuItem_Click);
             // 
             // impostaIndiceInternoToolStripMenuItem
             // 
             this.impostaIndiceInternoToolStripMenuItem.Name = "impostaIndiceInternoToolStripMenuItem";
-            this.impostaIndiceInternoToolStripMenuItem.Size = new System.Drawing.Size(197, 22);
+            this.impostaIndiceInternoToolStripMenuItem.Size = new System.Drawing.Size(221, 24);
             this.impostaIndiceInternoToolStripMenuItem.Text = "imposta indice interno";
             this.impostaIndiceInternoToolStripMenuItem.Click += new System.EventHandler(this.impostaIndiceInternoToolStripMenuItem_Click);
             // 
             // vaiARegistroToolStripMenuItem
             // 
             this.vaiARegistroToolStripMenuItem.Name = "vaiARegistroToolStripMenuItem";
-            this.vaiARegistroToolStripMenuItem.Size = new System.Drawing.Size(197, 22);
+            this.vaiARegistroToolStripMenuItem.Size = new System.Drawing.Size(221, 24);
             this.vaiARegistroToolStripMenuItem.Text = "vai a Registro";
             this.vaiARegistroToolStripMenuItem.Click += new System.EventHandler(this.vaiARegistroToolStripMenuItem_Click);
             // 
@@ -440,7 +440,7 @@ namespace viewer {
             // 
             this.trackZoom.LargeChange = 200;
             this.trackZoom.Location = new System.Drawing.Point(45, 225);
-            this.trackZoom.Maximum = 2000;
+            this.trackZoom.Maximum = 5000;
             this.trackZoom.Minimum = 200;
             this.trackZoom.Name = "trackZoom";
             this.trackZoom.Size = new System.Drawing.Size(213, 45);
@@ -509,7 +509,7 @@ namespace viewer {
             this.tabControl1.Location = new System.Drawing.Point(3, 3);
             this.tabControl1.Name = "tabControl1";
             this.tabControl1.SelectedIndex = 0;
-            this.tabControl1.Size = new System.Drawing.Size(1426, 893);
+            this.tabControl1.Size = new System.Drawing.Size(1295, 893);
             this.tabControl1.TabIndex = 18;
             this.tabControl1.TabStop = false;
             // 
@@ -519,7 +519,7 @@ namespace viewer {
             this.tabPage1.Location = new System.Drawing.Point(4, 22);
             this.tabPage1.Name = "tabPage1";
             this.tabPage1.Padding = new System.Windows.Forms.Padding(3);
-            this.tabPage1.Size = new System.Drawing.Size(1418, 867);
+            this.tabPage1.Size = new System.Drawing.Size(1287, 867);
             this.tabPage1.TabIndex = 0;
             this.tabPage1.Text = "immagine";
             this.tabPage1.UseVisualStyleBackColor = true;
@@ -861,61 +861,61 @@ namespace viewer {
             this.aggiungiAnnoToolStripMenuItem,
             this.impostaLocalitàToolStripMenuItem});
             this.contextMenuStrip2.Name = "contextMenuStrip2";
-            this.contextMenuStrip2.Size = new System.Drawing.Size(205, 180);
+            this.contextMenuStrip2.Size = new System.Drawing.Size(227, 196);
             // 
             // RinominaMenuStrip
             // 
             this.RinominaMenuStrip.Name = "RinominaMenuStrip";
-            this.RinominaMenuStrip.Size = new System.Drawing.Size(204, 22);
+            this.RinominaMenuStrip.Size = new System.Drawing.Size(226, 24);
             this.RinominaMenuStrip.Text = "Rinomina";
             this.RinominaMenuStrip.Click += new System.EventHandler(this.RinominaMenuStrip_Click);
             // 
             // cancellaToolStripMenuItem
             // 
             this.cancellaToolStripMenuItem.Name = "cancellaToolStripMenuItem";
-            this.cancellaToolStripMenuItem.Size = new System.Drawing.Size(204, 22);
+            this.cancellaToolStripMenuItem.Size = new System.Drawing.Size(226, 24);
             this.cancellaToolStripMenuItem.Text = "cancella";
             this.cancellaToolStripMenuItem.Click += new System.EventHandler(this.cancellaToolStripMenuItem_Click);
             // 
             // impostaPaginaToolStripMenuItem
             // 
             this.impostaPaginaToolStripMenuItem.Name = "impostaPaginaToolStripMenuItem";
-            this.impostaPaginaToolStripMenuItem.Size = new System.Drawing.Size(204, 22);
+            this.impostaPaginaToolStripMenuItem.Size = new System.Drawing.Size(226, 24);
             this.impostaPaginaToolStripMenuItem.Text = "imposta pagina indice";
             this.impostaPaginaToolStripMenuItem.Click += new System.EventHandler(this.impostaPaginaToolStripMenuItem_Click);
             // 
             // impostaIndiceToolStripMenuItem
             // 
             this.impostaIndiceToolStripMenuItem.Name = "impostaIndiceToolStripMenuItem";
-            this.impostaIndiceToolStripMenuItem.Size = new System.Drawing.Size(204, 22);
+            this.impostaIndiceToolStripMenuItem.Size = new System.Drawing.Size(226, 24);
             this.impostaIndiceToolStripMenuItem.Text = "imposta n. pagina indice";
             this.impostaIndiceToolStripMenuItem.Click += new System.EventHandler(this.impostaIndiceToolStripMenuItem_Click);
             // 
             // rielaboraNomiToolStripMenuItem
             // 
             this.rielaboraNomiToolStripMenuItem.Name = "rielaboraNomiToolStripMenuItem";
-            this.rielaboraNomiToolStripMenuItem.Size = new System.Drawing.Size(204, 22);
+            this.rielaboraNomiToolStripMenuItem.Size = new System.Drawing.Size(226, 24);
             this.rielaboraNomiToolStripMenuItem.Text = "riordina nomi";
             this.rielaboraNomiToolStripMenuItem.Click += new System.EventHandler(this.rielaboraNomiToolStripMenuItem_Click);
             // 
             // openInBrowserToolStripMenuItem1
             // 
             this.openInBrowserToolStripMenuItem1.Name = "openInBrowserToolStripMenuItem1";
-            this.openInBrowserToolStripMenuItem1.Size = new System.Drawing.Size(204, 22);
+            this.openInBrowserToolStripMenuItem1.Size = new System.Drawing.Size(226, 24);
             this.openInBrowserToolStripMenuItem1.Text = "Open in browser";
             this.openInBrowserToolStripMenuItem1.Click += new System.EventHandler(this.openInBrowserToolStripMenuItem1_Click);
             // 
             // aggiungiAnnoToolStripMenuItem
             // 
             this.aggiungiAnnoToolStripMenuItem.Name = "aggiungiAnnoToolStripMenuItem";
-            this.aggiungiAnnoToolStripMenuItem.Size = new System.Drawing.Size(204, 22);
+            this.aggiungiAnnoToolStripMenuItem.Size = new System.Drawing.Size(226, 24);
             this.aggiungiAnnoToolStripMenuItem.Text = "Aggiungi Tipo";
             this.aggiungiAnnoToolStripMenuItem.Click += new System.EventHandler(this.aggiungiAnnoToolStripMenuItem_Click);
             // 
             // impostaLocalitàToolStripMenuItem
             // 
             this.impostaLocalitàToolStripMenuItem.Name = "impostaLocalitàToolStripMenuItem";
-            this.impostaLocalitàToolStripMenuItem.Size = new System.Drawing.Size(204, 22);
+            this.impostaLocalitàToolStripMenuItem.Size = new System.Drawing.Size(226, 24);
             this.impostaLocalitàToolStripMenuItem.Text = "Imposta Località";
             this.impostaLocalitàToolStripMenuItem.Click += new System.EventHandler(this.impostaLocalitàToolStripMenuItem_Click);
             // 
@@ -1423,7 +1423,7 @@ namespace viewer {
             this.txtNodo.Multiline = true;
             this.txtNodo.Name = "txtNodo";
             this.txtNodo.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.txtNodo.Size = new System.Drawing.Size(452, 538);
+            this.txtNodo.Size = new System.Drawing.Size(409, 538);
             this.txtNodo.TabIndex = 22;
             // 
             // label8
@@ -1489,7 +1489,7 @@ namespace viewer {
             // 
             this.statusStrip.Location = new System.Drawing.Point(0, 966);
             this.statusStrip.Name = "statusStrip";
-            this.statusStrip.Size = new System.Drawing.Size(1908, 22);
+            this.statusStrip.Size = new System.Drawing.Size(1734, 22);
             this.statusStrip.TabIndex = 34;
             this.statusStrip.Text = "-";
             // 
@@ -1546,8 +1546,8 @@ namespace viewer {
             // 
             this.splitContainer1.Panel2.Controls.Add(this.tabNodo);
             this.splitContainer1.Panel2MinSize = 100;
-            this.splitContainer1.Size = new System.Drawing.Size(1908, 896);
-            this.splitContainer1.SplitterDistance = 1432;
+            this.splitContainer1.Size = new System.Drawing.Size(1734, 896);
+            this.splitContainer1.SplitterDistance = 1301;
             this.splitContainer1.SplitterWidth = 10;
             this.splitContainer1.TabIndex = 39;
             // 
@@ -1565,7 +1565,7 @@ namespace viewer {
             this.tabNodo.Multiline = true;
             this.tabNodo.Name = "tabNodo";
             this.tabNodo.SelectedIndex = 0;
-            this.tabNodo.Size = new System.Drawing.Size(466, 896);
+            this.tabNodo.Size = new System.Drawing.Size(423, 896);
             this.tabNodo.TabIndex = 24;
             // 
             // tabPageRegistro
@@ -1576,7 +1576,7 @@ namespace viewer {
             this.tabPageRegistro.Location = new System.Drawing.Point(4, 25);
             this.tabPageRegistro.Name = "tabPageRegistro";
             this.tabPageRegistro.Padding = new System.Windows.Forms.Padding(3);
-            this.tabPageRegistro.Size = new System.Drawing.Size(458, 867);
+            this.tabPageRegistro.Size = new System.Drawing.Size(415, 867);
             this.tabPageRegistro.TabIndex = 0;
             this.tabPageRegistro.Text = "Reg";
             this.tabPageRegistro.UseVisualStyleBackColor = true;
@@ -1592,7 +1592,7 @@ namespace viewer {
             this.txtScreen.Multiline = true;
             this.txtScreen.Name = "txtScreen";
             this.txtScreen.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.txtScreen.Size = new System.Drawing.Size(452, 284);
+            this.txtScreen.Size = new System.Drawing.Size(409, 284);
             this.txtScreen.TabIndex = 52;
             // 
             // btnScreen
@@ -2095,7 +2095,7 @@ namespace viewer {
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1908, 988);
+            this.ClientSize = new System.Drawing.Size(1734, 988);
             this.Controls.Add(this.chkSerial);
             this.Controls.Add(this.btnRotateReg);
             this.Controls.Add(this.btnAnnoDopo);

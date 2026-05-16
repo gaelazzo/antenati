@@ -1,28 +1,29 @@
+using BitlyAPI;
+using Gedcom;
+using GedcomParser;
+using Newtonsoft.Json;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using System.Net.Http;
-using BitlyAPI;
-using System.Text.RegularExpressions;
-using System.Globalization;
-using Newtonsoft.Json;
 using Control = System.Windows.Forms.Control;
-using GedcomParser;
-using Gedcom;
-using System.Net.Http.Headers;
-using System.Text.Json;
 
 
 
@@ -34,19 +35,23 @@ namespace viewer {
     public partial class Viewer : Form {
         static object hashSemaphore = new object();
         HashSet<string> existingRequests = new HashSet<string>();
+        int BASE_WIDTH = 1200;
+		int BASE_HEIGTH = 1200;
 
-        /// <summary>
-        /// Gets the path for the image of a specified code in the current register
-        /// </summary>
-        /// <param name="code"></param>
-        /// <returns></returns>
-        string PathFromCode(string code) {
+		int currImageWidth = 1000;
+
+		/// <summary>
+		/// Gets the path for the image of a specified code in the current register
+		/// </summary>
+		/// <param name="code"></param>
+		/// <returns></returns>
+		string PathFromCode(string code) {
             if (getCurrRegister() == null)
                 return null;
             string fName = code + ".jpg";
             fName = Regex.Replace(fName, "([A-Z])", "_$1");
-            string fPath = Path.Combine("data", getCurrRegister().idRegistro, fName);
-            return fPath;
+            string fPath = Path.Combine("data",  fName); //getCurrRegister().idRegistro,
+			return fPath;
         }
 
         void addRequest(string code) {
@@ -54,8 +59,7 @@ namespace viewer {
                 existingRequests.Add(PathFromCode(code));
             }
         }
-        string getImageUrlByCode(string code) {
-            int width = mapWidth[code];
+        string getImageUrlByCode(string code, int width) {
 			// {scheme}://{server}/iiif/2/{identifier}/{region}/{size}/{rotation}/{quality}.{format}
 			//return "https://iiif-antenati.cultura.gov.it/iiif/2/" + code + "/full/full/0/default.jpg";
 			// https://iiif-antenati.cultura.gov.it/iiif/2/5VrBEzV/0,2048,1024,518/1024,/0/default.jpg
@@ -66,12 +70,18 @@ namespace viewer {
 
 		void removeRequest(string code) {
             lock (hashSemaphore) {
+                Console.WriteLine($"Rimuovo richiesta {code}");
                 if (existingRequests.Contains(PathFromCode(code)))
                     existingRequests.Remove(PathFromCode(code));
             }
         }
 
-        bool checkFileRequestExists(string code) {
+		/// <summary>
+		/// Checks if a file request is already in progress or the file already exists
+		/// </summary>
+		/// <param name="code"></param>
+		/// <returns></returns>
+		bool checkFileRequestExists(string code) {
             lock (hashSemaphore) {
                 if (existingRequests.Contains(PathFromCode(code)))
                     return true;
@@ -88,10 +98,10 @@ namespace viewer {
         }
 
         class noteToAdd {
-            public System.Windows.Forms.TreeNodeCollection collection;
-            public System.Windows.Forms.TreeNode n;
-            public string filename;
-            public bool autoexplore;
+            public System.Windows.Forms.TreeNodeCollection collection=null;
+            public System.Windows.Forms.TreeNode n = null;
+            public string filename = null;
+            public bool autoexplore=false;
             public bool toGo = false;
         }
 
@@ -388,36 +398,36 @@ namespace viewer {
             var segments = uri.Segments;
             if (segments.Length > 4) { // Il segmento aggiuntivo è presente
                 string lastSegment = segments[segments.Length - 1]; // Ottieni l'ultimo segmento
-                return setPageByCode(lastSegment);
+                return setPageByCode(lastSegment, currImageWidth);
             }
             else { // L'URL termina senza il segmento aggiuntivo
-                return setPageByNumber(1);
+                return setPageByNumber(1, currImageWidth);
             }
         }
 
 
-        string setPageByCode(string code) {
+        string setPageByCode(string code, int width) {
             if (pageDecode.ContainsKey(pageCode)) {
                 pageCode = code;
                 pageNumber = pageDecode[pageCode];
-                return loadJpg(pageCode);
+                return loadJpg(pageCode, width);
             }
             return pageCode;
         }
 
-        string setPageByNumber(int nPage) {
+        string setPageByNumber(int nPage, int width) {
 
             if (mapPage.ContainsKey(nPage)) {
                 pageNumber = nPage;
                 pageCode = mapPage[pageNumber];
-                return loadJpg(pageCode);
+                return loadJpg(pageCode, width);
             }
             return null;
         }
 
-        string loadJpg(string code) {
-			var imgUrl = getImageUrlByCode(code);
-			return loadImage(imgUrl);
+        string loadJpg(string code, int width) {
+			var imgUrl = getImageUrlByCode(code, width);
+			return loadImage(imgUrl,width);
 
         }
 
@@ -463,8 +473,8 @@ namespace viewer {
                 if (!mapPage.ContainsKey(curr)) {
                     break;
                 }
-
-                /*new Task((o_currPrecaching) => {
+                
+				/*new Task((o_currPrecaching) => {
                     int currPrecaching = (int)o_currPrecaching;
                     if (loadImage(mapPage[currPrecaching]) == null) {
                         stopCaching = true;
@@ -472,8 +482,8 @@ namespace viewer {
                         
                 },curr).Start();
                 */
-                currPrecaching = curr;
-                if (loadImage(mapPage[curr]) == null)
+				currPrecaching = curr;
+                if (loadImage(mapPage[curr], currImageWidth) == null)
                     break;
                 curr += step;
 
@@ -502,15 +512,41 @@ namespace viewer {
 
 
 
-
-        string loadImage(int num) {
+		/// <summary>
+		/// Carica una immagine in base al suo numero nella sequenza
+		/// </summary>
+		/// <param name="num"></param>
+		/// <returns></returns>
+		string loadImage(int num) {
             if (!mapPage.ContainsKey(num)) {
                 return null;
             }
-            return loadImage(mapPage[num]);
+            return loadImage(mapPage[num], currImageWidth);
         }
 
-        string loadImage(string code) {
+        void deleteCache() {
+			string[] files = Directory.GetFiles("data", "*.jpg", SearchOption.TopDirectoryOnly);
+
+			foreach (string file in files) {
+				try {
+					File.Delete(file);
+                    savedFiles.Remove(file);
+                    esistenti.Remove(file);
+					Console.WriteLine($"Cancellato: {Path.GetFileName(file)}");
+				}
+				catch (Exception ex) {
+					Console.WriteLine($"Errore durante la cancellazione di {file}: {ex.Message}");
+				}
+			}
+		}
+
+		/// <summary>
+		/// Carica l'immagine corrispondente al codice specificato e la aggiunge a esistenti e savedFiles
+		/// </summary>
+		/// <param name="code"></param>
+		/// <param name="width"></param>
+		/// <returns></returns>
+		string loadImage(string code, int width) {
             if (checkError(code))
                 return null;
             if (!pageDecode.ContainsKey(code))
@@ -518,37 +554,46 @@ namespace viewer {
             int num = pageDecode[code];
             string codePrec = mapPage[num];
             string fPath = PathFromCode(code);
-            if (savedFiles.Contains(fPath))
-                return fPath;
+            if (savedFiles.Contains(fPath)) {
+                Console.WriteLine($"File {fPath} già presente in savedFiles");
+				return fPath;
+			}
+            
             try {
                 if (!checkFileRequestExists(code)) {
                     addRequest(code);
-                    if (!queueDownloadFile(code, fPath, false)) {
+                    Console.WriteLine($"Aggiungo in coda richiesta per {code}");
+                    if (!queueDownloadFile(code, width, fPath, false)) {
                         removeRequest(code);
                         return null;
                     }
 
                     var f = new FileInfo(fPath);
                     if (f.Length < 10000) {
-                        System.IO.File.Delete(fPath);
+						File.Delete(fPath);
                         removeRequest(code);
                         return null;
                     }
 
-                    var imageToDisplay = System.Drawing.Image.FromFile(fPath);
-                    if (imageToDisplay.Height < 1000 || imageToDisplay.Width < 1000) {
+					Image imageToDisplay;
+					using (var fs = new FileStream(fPath, FileMode.Open, FileAccess.Read)) {
+						imageToDisplay = Image.FromStream(fs);
+					}					
+
+                    if (imageToDisplay.Height < 100 || imageToDisplay.Width < 100) {
                         removeRequest(code);
-                        return null;
+						imageToDisplay.Dispose();
+						return null;
                     }
                     if (num > 0) {
                         string fNamePrec = codePrec + ".jpg";
                         string fPathPrec = PathFromCode(codePrec);
-                        if (System.IO.File.Exists(fPathPrec)) {
+                        if (File.Exists(fPathPrec)) {
                             var fPrec = new FileInfo(fPathPrec);
                             if (fPrec.Length < f.Length) {
                                 if (savedFiles.Contains(codePrec.ToString()))
                                     savedFiles.Remove(codePrec.ToString());
-                                System.IO.File.Delete(fPathPrec);
+                                File.Delete(fPathPrec);
                             }
                         }
                     }
@@ -566,9 +611,9 @@ namespace viewer {
             }
             catch (Exception e) {
                 MessageBox.Show(e.ToString(), "Errore");
-                if (System.IO.File.Exists(fPath)) {
+                if (File.Exists(fPath)) {
                     try {
-                        System.IO.File.Delete(fPath);
+                        File.Delete(fPath);
                     }
                     catch {
 
@@ -583,68 +628,106 @@ namespace viewer {
         int xScroll = 0;
         int yScroll = 0;
         int zoom = 0;
+        int lastImageWidth = 0;
+		int lastImageHeigth = 0;
+        bool isZoomAllowed(int zoom) {
+			var zoomFactor = Convert.ToDouble(zoom) / 1000.0;
+
+			Size newSize = new Size((int)(Math.Round(Convert.ToDouble(BASE_WIDTH * zoomFactor))),
+					(int)(Math.Round(Convert.ToDouble(BASE_HEIGTH * zoomFactor))));
+
+            if (newSize.Width < 100) {
+                return false;
+			}
+			if (newSize.Width > 4000) {
+				return false;
+			}
+            return true;
+		}
+		void recalculateCurrentImageWidth(int zoom) {
+			var zoomFactor = Convert.ToDouble(zoom) / 1000.0;
+			//Size newSize = new Size((int)(Math.Round(Convert.ToDouble(lastImageWidth * zoomFactor))),
+			//		(int)(Math.Round(Convert.ToDouble(lastImageHeigth * zoomFactor))));
+			//currImageWidth = newSize.Width;
+			currImageWidth = (int)Math.Round(BASE_WIDTH * zoomFactor);
+            deleteCache();            
+		}
+
+		int prevWidth = 0;
+		int prevHeight = 0;
+
         void displayImage(Image imgBase) {
             if (drawing)
                 return;
             drawing = true;
 
+			Image oldImage = null;
 
-            bool thereWasImage = (lastImage != null);
+			bool thereWasImage = (lastImage != null);
             if (imgBase != null && lastImage != imgBase) {
-                lastImage?.Dispose();
+				oldImage = lastImage;				 
                 lastImage = imgBase;
             }
-            else {
-                imgBase = lastImage;
-            }
+            //else {
+            //    imgBase = lastImage;
+            //}
 
             if (imgBase == null) {
-                drawing = false;
+				lastImage?.Dispose();
+                lastImage = null;
+				pic.Image = null;
+				drawing = false;
                 return;
             }
 
             try {
-                trackZoom.Value = zoom;
-                var zoomFactor = Convert.ToDouble(zoom) / 1000.0;
-                Size newSize = new Size((int)(Math.Round(Convert.ToDouble(imgBase.Width * zoomFactor))),
-                    (int)(Math.Round(Convert.ToDouble(imgBase.Height * zoomFactor))));
-                var img = new Bitmap(imgBase, newSize);
+                //            trackZoom.Value = zoom;
+                //            var zoomFactor = Convert.ToDouble(zoom) / 1000.0;
+                //            lastImageWidth = (int)(Math.Round(Convert.ToDouble(imgBase.Width * zoomFactor)));
+                //            lastImageHeigth = (int)(Math.Round(Convert.ToDouble(imgBase.Height * zoomFactor)));
+                //Size newSize = new Size(lastImageWidth, lastImageHeigth);
+                //            var img = new Bitmap(imgBase, newSize);
 
-                //imgBase.Dispose();
+
                 if (chkContrast.Checked) {
-                    processImage((Bitmap)img, contrastBar.Value);
-                    //ApplyContrast(contrastBar.Value,(Bitmap) imgBase);
+                    processImage((Bitmap)imgBase, contrastBar.Value);                ///img
                 }
 
-                var lastxRate = pic.Image == null ? 0 : xScroll * 1.0 / pic.Image.Width;
-                var lastyRate = pic.Image == null ? 0 : yScroll * 1.0 / pic.Image.Height;
+                // 1. Calcolo posizione scroll attuale in percentuale
+                double lastXRate = 0, lastYRate = 0;
+
+                if (pic.Image != null) {
+                    prevWidth = pic.Image.Width;
+                    prevHeight = pic.Image.Height;
+
+                    lastXRate = xScroll / (double)prevWidth;
+                    lastYRate = yScroll / (double)prevHeight;
+                }
+
                 //pic.Image?.Dispose();
+                // 2. Sostituisco immagine
+                lastImage = imgBase;
+                pic.Image = imgBase;
+				oldImage?.Dispose();
+                Console.WriteLine("Nuova immagine visualizzata");
+				// 3. Ripristino lo scroll
+				if (thereWasImage) {
+					xScroll = (int)Math.Round(lastXRate * pic.Image.Width);
+					yScroll = (int)Math.Round(lastYRate * pic.Image.Height);
 
-                pic.Image = img;
-                if (thereWasImage) {
-                    var val = Convert.ToInt32(Math.Round(lastxRate * img.Width));
-                    if (val < imgPanel.HorizontalScroll.Minimum)
-                        val = imgPanel.HorizontalScroll.Minimum;
-                    if (val > imgPanel.HorizontalScroll.Maximum)
-                        val = imgPanel.HorizontalScroll.Maximum;
-                    imgPanel.HorizontalScroll.Value = val;
-                    xScroll = val;
+					xScroll = Math.Max(imgPanel.HorizontalScroll.Minimum, Math.Min(xScroll, imgPanel.HorizontalScroll.Maximum));
+					yScroll = Math.Max(imgPanel.VerticalScroll.Minimum, Math.Min(yScroll, imgPanel.VerticalScroll.Maximum));
 
-                    val = Convert.ToInt32(Math.Round(lastyRate * img.Height));
-                    if (val < imgPanel.VerticalScroll.Minimum)
-                        val = imgPanel.VerticalScroll.Minimum;
-                    if (val > imgPanel.VerticalScroll.Maximum)
-                        val = imgPanel.VerticalScroll.Maximum;
-
-                    imgPanel.VerticalScroll.Value = val;
-                    yScroll = val;
+                    imgPanel.HorizontalScroll.Value = xScroll;
+                    imgPanel.VerticalScroll.Value = yScroll;
                 }
             }
             catch (Exception e) {
                 string err = e.ToString();
             }
-
-            drawing = false;
+            finally {
+                drawing = false;
+            }
         }
 
         bool drawing = false;
@@ -939,7 +1022,7 @@ namespace viewer {
                         if (mapPage.ContainsKey(requestedImage)) {
                             int saved = requestedImage;
                             startPrecache(currentImage + standardStep, true);
-                            fPath = loadImage(mapPage[saved]);
+                            fPath = loadImage(mapPage[saved], currImageWidth);
                             if (fPath == null) {
                                 updating = false;
                                 toMarkImportant = false;
@@ -952,9 +1035,9 @@ namespace viewer {
                                     nEffettivo = saved;
                                 }
                             }
-                            catch (FileNotFoundException f) {
-                                //savedFiles.Remove(fPath);                               
-                            }
+                            //catch (FileNotFoundException f) {
+                            //    //savedFiles.Remove(fPath);                               
+                            //}
                             catch {
                             }
 
@@ -1091,7 +1174,6 @@ namespace viewer {
 
         private Image imageToDisplay = null;
 
-        private int lastLen = 0;
 
         void pushHistory(RifPage rif) {
             string val = rif.toString();
@@ -1112,13 +1194,20 @@ namespace viewer {
         private void trackZoom_ValueChanged(object sender, EventArgs e) {
 
             zoom = trackZoom.Value;
-            displayImage(null);
+            //displayImage(null);
         }
 
-        void zoomStepIn() {
+       
+		void zoomStepIn() {
             try {
-                if (trackZoom.Value + 50 > trackZoom.Minimum)
-                    trackZoom.Value += 50;
+                if (trackZoom.Value + 100 > trackZoom.Minimum && isZoomAllowed(trackZoom.Value-100)) {
+					trackZoom.Value += 100;
+					displayImage(null);
+					recalculateCurrentImageWidth(trackZoom.Value);
+                    reloadImage();
+
+				}
+                    
             }
             catch {
 
@@ -1126,8 +1215,13 @@ namespace viewer {
         }
         void zoomStepOut() {
             try {
-                if (trackZoom.Value - 50 > trackZoom.Minimum)
-                    trackZoom.Value -= 50;
+                if (trackZoom.Value - 100 > trackZoom.Minimum && isZoomAllowed(trackZoom.Value - 100)) {
+					trackZoom.Value -= 100;
+					displayImage(null);
+					recalculateCurrentImageWidth(trackZoom.Value);
+					reloadImage();
+				}
+                    
             }
             catch {
 
@@ -1247,7 +1341,7 @@ namespace viewer {
         //}
 
 
-        public bool queueDownloadFile(string code, string path, bool forced = true) {
+        public bool queueDownloadFile(string code, int width, string path, bool forced = true) {
             WebClient w = null;
             string folder = Path.GetDirectoryName(path);
             if (!Directory.Exists(folder)) {
@@ -1262,9 +1356,9 @@ namespace viewer {
                     Sdownload.WaitOne();
 
 
-                string url =getImageUrlByCode(code);  //  "https://iiif-antenati.cultura.gov.it/iiif/2/LPbBpOd/full/956,/0/default.jpg"
+                string url =getImageUrlByCode(code, width);  //  "https://iiif-antenati.cultura.gov.it/iiif/2/LPbBpOd/full/956,/0/default.jpg"
 				currExploring = url;
-
+                Console.WriteLine($"Richiedo file immagine {url}");
 				Dictionary<string, string> cookies = new Dictionary<string, string>();
     //            var _ga = PageLoader.getCookie("_ga");  //GA1.1.1208148208.1762619312
 				//var _gid = PageLoader.getCookie("_ga_HPLTCJ58MW");
@@ -1275,17 +1369,17 @@ namespace viewer {
 				//Console.WriteLine("Reading address " + url);
 				//cookies.Add("_ga", _ga);
 				//cookies.Add("_ga_HPLTCJ58MW", _gid);  //GS2.1.s1762619311$o1$g1$t1762622216$j58$l0$h0
-				cookies.Add("_ga", "GA1.1.1208148208.1762619312");
-				cookies.Add("_ga_HPLTCJ58MW", "GS2.1.s1762676767$o4$g1$t1762676853$j59$l0$h0");  //GS2.1.s1762619311$o1$g1$t1762622216$j58$l0$h0
+				//cookies.Add("_ga", "GA1.1.1208148208.1762619312");
+				//cookies.Add("_ga_HPLTCJ58MW", "GS2.1.s1762676767$o4$g1$t1762676853$j59$l0$h0");  //GS2.1.s1762619311$o1$g1$t1762622216$j58$l0$h0
 
 
 				Dictionary<string, string> headers = new Dictionary<string, string>();
-				//headers.Add("Accept", "*/*");
-				//headers.Add("Accept-Encoding", "gzip, deflate, br, zstd");
-				//headers.Add("Accept-Language", "it,en-US;q=0.9,en;q=0.8");
-				//headers.Add("Origin", "https://antenati.cultura.gov.it");
-				//headers.Add("Priority", "u=1, i");
-				headers.Add("Referer", "https://antenati.cultura.gov.it");
+                //headers.Add("Accept", "*/*");
+                headers.Add("Accept-Encoding", "gzip, deflate");
+                //headers.Add("Accept-Language", "it,en-US;q=0.9,en;q=0.8");
+                //headers.Add("Origin", "https://antenati.cultura.gov.it");
+                //headers.Add("Priority", "u=1, i");
+                headers.Add("Referer", "https://antenati.cultura.gov.it");
 
 				headers.Add("Sec-Ch-Ua", @"""Chromium"";v=""142"", ""Google Chrome"";v=""142"", ""Not?A_Brand"";v=""99""");
 				headers.Add("Sec-Ch-Ua-Mobile", "?0");
@@ -1293,7 +1387,7 @@ namespace viewer {
 				headers.Add("Sec-Fetch-Dest", "empty");
 				headers.Add("Sec-Fetch-Mode", "cors");
 				headers.Add("Sec-Fetch-Site", "same-site");
-				headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36");
+				//headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36");
 
 
 				
@@ -2495,7 +2589,7 @@ namespace viewer {
         }
 
         private void treeViewCitta_AfterSelect(object sender, TreeViewEventArgs e) {
-            bool indexAvailable = false;
+            //bool indexAvailable = false;
             if (treeViewCitta.SelectedNode != null) {
                 var currNode = treeViewCitta.SelectedNode;
                 if (currNode.Tag != null) {
@@ -2929,7 +3023,16 @@ namespace viewer {
             pic.Refresh();
         }
 
-        void viewImage(int n) {
+        void reloadImage() {
+            int n = getNum();
+            viewImage(n);
+		}
+
+		/// <summary>
+		/// Carica e visualizza l'immagine n-esima con la dimensione corrente
+		/// </summary>
+		/// <param name="n"></param>
+		void viewImage(int n) {
             if (n == 0) {
                 return;
             }
@@ -3103,7 +3206,7 @@ namespace viewer {
 
 
 
-            var longUrl = getImageUrlByCode(txtCode.Text);
+            var longUrl = getImageUrlByCode(txtCode.Text, currImageWidth);
             //Clipboard.SetText(ShortenUrl(longUrl));
 
             Clipboard.SetText(await ShortenUrl(longUrl));
@@ -3223,7 +3326,7 @@ namespace viewer {
         }
 
         private void openInBrowserToolStripMenuItem_Click(object sender, EventArgs e) {
-            txtWebAddress.Text = getImageUrlByCode(txtCode.Text);
+            txtWebAddress.Text = getImageUrlByCode(txtCode.Text, currImageWidth);
         }
 
         private void openInBrowserToolStripMenuItem1_Click(object sender, EventArgs e) {
@@ -3455,20 +3558,31 @@ namespace viewer {
 
         }
         void addImportanteImage() {
-            if (getMark() == null)
+            var mark = getMark();
+            if (mark == null)
                 return;
-            var fileName = getMark() + ".jpg";
+            var fileName = mark.rif + ".jpg";
             string source = loadImage(getNum());
             if (source == null)
                 return;
-            System.IO.File.Copy(source, Path.Combine("important", fileName), true);
+            try {
+                System.IO.File.Copy(source, Path.Combine("important", fileName), true);
+            }
+            catch (Exception e) {
+                MessageBox.Show("Errore copiando il file " + Path.Combine("important", fileName));
+            }
         }
         void removeImportanteImage() {
-            if (getMark() == null)
+            var mark = getMark();
+            if (mark == null)
                 return;
-            var fileName = getMark() + ".jpg";
-            System.IO.File.Delete(Path.Combine("important", fileName));
-
+            var fileName = mark.rif + ".jpg";
+            try {
+                System.IO.File.Delete(Path.Combine("important", fileName));
+            }
+            catch (Exception e) {
+                MessageBox.Show("Errore eliminando il file " + fileName);
+            }
         }
         void setImportante() {
             var curr = getMark();

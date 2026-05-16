@@ -351,7 +351,26 @@ namespace Gedcom
 		#endregion
 
 		#region Methods
-		
+		public override bool Equals(object obj)
+		{
+			GedcomDate other = obj as GedcomDate;
+			if (other == null)
+			{
+				return false;
+			}
+			return this == other;
+		}
+
+		public override int GetHashCode()
+		{
+			int hash = 17;
+			hash = hash * 23 + DateType.GetHashCode();
+			hash = hash * 23 + DatePeriod.GetHashCode();
+			hash = hash * 23 + (Date1?.GetHashCode() ?? 0);
+			hash = hash * 23 + (Date2?.GetHashCode() ?? 0);
+			return hash;
+		}
+
 		public static bool operator < (GedcomDate a, GedcomDate b)
 		{
 			int ret = GedcomDate.CompareByDate(a, b);
@@ -700,7 +719,6 @@ namespace Gedcom
             		// FIXME: no FrenCalendar!
 					Date1 = dataString;
 					throw new NotImplementedException();
-            		break;
             	case GedcomDateType.Gregorian:
             		if (_gregorian == null)
             		{
@@ -729,7 +747,6 @@ namespace Gedcom
             		// FIXME: no RomanCalendar!
 					Date1 = dataString;
 					throw new NotImplementedException();
-            		break;
             }
             
 			// FIXME: the split here accounts for large(ish) amounts of memory allocation
@@ -845,7 +862,6 @@ namespace Gedcom
 			string year = string.Empty;
 			string month = string.Empty;
 			string day = string.Empty;
-			bool bc = false;
 
 			DateTime? ret = null;
 			
@@ -858,10 +874,8 @@ namespace Gedcom
 				{
 					// year only
 	           		year = dateSplit[start];
-	           		bc = false;
 	           		if (year.EndsWith("B.C.", true, culture))
 	           		{
-	           			bc = true;
 	           			year = year.Substring(0, year.Length - "B.C.".Length);
 	           		}
 				}
@@ -872,10 +886,8 @@ namespace Gedcom
 	           		
 	           		// year
 	           		year = dateSplit[start + 1];
-	           		bc = false;
 	           		if (year.EndsWith("B.C.", true, culture))
 	           		{
-	           			bc = true;
 	           			year = year.Substring(0, year.Length - "B.C.".Length);
 	           		}
 				}
@@ -889,10 +901,8 @@ namespace Gedcom
 	           		
 	           		// year
 	           		year = dateSplit[start + 2];
-	           		bc = false;
 	           		if (year.EndsWith("B.C.", true, culture))
 	           		{
-	           			bc = true;
 	           			year = year.Substring(0, year.Length - "B.C.".Length);
 	           		}
 				}
