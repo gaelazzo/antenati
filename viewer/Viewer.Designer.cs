@@ -264,7 +264,7 @@ namespace viewer {
             // 
             this.pic.Location = new System.Drawing.Point(3, 4);
             this.pic.Name = "pic";
-            this.pic.Size = new System.Drawing.Size(1370, 811);
+            this.pic.Size = new System.Drawing.Size(1247, 811);
             this.pic.TabIndex = 3;
             this.pic.TabStop = false;
             // 
@@ -441,7 +441,7 @@ namespace viewer {
             this.trackZoom.LargeChange = 200;
             this.trackZoom.Location = new System.Drawing.Point(45, 225);
             this.trackZoom.Maximum = 5000;
-            this.trackZoom.Minimum = 200;
+            this.trackZoom.Minimum = 50;
             this.trackZoom.Name = "trackZoom";
             this.trackZoom.Size = new System.Drawing.Size(213, 45);
             this.trackZoom.TabIndex = 11;
@@ -560,7 +560,7 @@ namespace viewer {
             this.tabPage2.Location = new System.Drawing.Point(4, 22);
             this.tabPage2.Name = "tabPage2";
             this.tabPage2.Padding = new System.Windows.Forms.Padding(3);
-            this.tabPage2.Size = new System.Drawing.Size(1418, 867);
+            this.tabPage2.Size = new System.Drawing.Size(1287, 867);
             this.tabPage2.TabIndex = 1;
             this.tabPage2.Text = "explorer";
             this.tabPage2.UseVisualStyleBackColor = true;
@@ -818,7 +818,7 @@ namespace viewer {
             this.txtGenerali.Multiline = true;
             this.txtGenerali.Name = "txtGenerali";
             this.txtGenerali.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.txtGenerali.Size = new System.Drawing.Size(1065, 675);
+            this.txtGenerali.Size = new System.Drawing.Size(934, 675);
             this.txtGenerali.TabIndex = 36;
             // 
             // txtAddress
@@ -952,7 +952,7 @@ namespace viewer {
             this.tabPage3.Location = new System.Drawing.Point(4, 22);
             this.tabPage3.Name = "tabPage3";
             this.tabPage3.Padding = new System.Windows.Forms.Padding(3);
-            this.tabPage3.Size = new System.Drawing.Size(1418, 867);
+            this.tabPage3.Size = new System.Drawing.Size(1287, 867);
             this.tabPage3.TabIndex = 2;
             this.tabPage3.Text = "comandi";
             this.tabPage3.UseVisualStyleBackColor = true;
@@ -1081,7 +1081,7 @@ namespace viewer {
             this.historyList.ItemHeight = 20;
             this.historyList.Location = new System.Drawing.Point(14, 192);
             this.historyList.Name = "historyList";
-            this.historyList.Size = new System.Drawing.Size(987, 624);
+            this.historyList.Size = new System.Drawing.Size(856, 624);
             this.historyList.TabIndex = 8;
             this.historyList.DoubleClick += new System.EventHandler(this.historyList_DoubleClick);
             // 
@@ -1166,7 +1166,7 @@ namespace viewer {
             this.tabPage4.Location = new System.Drawing.Point(4, 22);
             this.tabPage4.Name = "tabPage4";
             this.tabPage4.Padding = new System.Windows.Forms.Padding(3);
-            this.tabPage4.Size = new System.Drawing.Size(1418, 867);
+            this.tabPage4.Size = new System.Drawing.Size(1287, 867);
             this.tabPage4.TabIndex = 3;
             this.tabPage4.Text = "Browser";
             this.tabPage4.UseVisualStyleBackColor = true;
@@ -1191,7 +1191,7 @@ namespace viewer {
             this.webView.DefaultBackgroundColor = System.Drawing.Color.White;
             this.webView.Location = new System.Drawing.Point(6, 61);
             this.webView.Name = "webView";
-            this.webView.Size = new System.Drawing.Size(1406, 800);
+            this.webView.Size = new System.Drawing.Size(1275, 800);
             this.webView.TabIndex = 8;
             this.webView.ZoomFactor = 1D;
             // 
@@ -1267,7 +1267,7 @@ namespace viewer {
             this.tabPage5.Location = new System.Drawing.Point(4, 22);
             this.tabPage5.Name = "tabPage5";
             this.tabPage5.Padding = new System.Windows.Forms.Padding(3);
-            this.tabPage5.Size = new System.Drawing.Size(1418, 867);
+            this.tabPage5.Size = new System.Drawing.Size(1287, 867);
             this.tabPage5.TabIndex = 4;
             this.tabPage5.Text = "Città";
             this.tabPage5.UseVisualStyleBackColor = true;
@@ -1292,7 +1292,7 @@ namespace viewer {
             this.txtNotes2.Multiline = true;
             this.txtNotes2.Name = "txtNotes2";
             this.txtNotes2.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.txtNotes2.Size = new System.Drawing.Size(1111, 808);
+            this.txtNotes2.Size = new System.Drawing.Size(980, 808);
             this.txtNotes2.TabIndex = 8;
             // 
             // treeViewCitta
@@ -1316,7 +1316,7 @@ namespace viewer {
             this.FamilyTreeTab.Location = new System.Drawing.Point(4, 22);
             this.FamilyTreeTab.Name = "FamilyTreeTab";
             this.FamilyTreeTab.Padding = new System.Windows.Forms.Padding(3);
-            this.FamilyTreeTab.Size = new System.Drawing.Size(1418, 867);
+            this.FamilyTreeTab.Size = new System.Drawing.Size(1287, 867);
             this.FamilyTreeTab.TabIndex = 5;
             this.FamilyTreeTab.Text = "Family Tree";
             this.FamilyTreeTab.UseVisualStyleBackColor = true;
@@ -1612,7 +1612,7 @@ namespace viewer {
             this.tabPageCitta.Location = new System.Drawing.Point(4, 25);
             this.tabPageCitta.Name = "tabPageCitta";
             this.tabPageCitta.Padding = new System.Windows.Forms.Padding(3);
-            this.tabPageCitta.Size = new System.Drawing.Size(458, 867);
+            this.tabPageCitta.Size = new System.Drawing.Size(415, 867);
             this.tabPageCitta.TabIndex = 1;
             this.tabPageCitta.Text = "City";
             this.tabPageCitta.UseVisualStyleBackColor = true;
@@ -1627,7 +1627,7 @@ namespace viewer {
             this.txtCitta.Multiline = true;
             this.txtCitta.Name = "txtCitta";
             this.txtCitta.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.txtCitta.Size = new System.Drawing.Size(452, 861);
+            this.txtCitta.Size = new System.Drawing.Size(409, 861);
             this.txtCitta.TabIndex = 23;
             // 
             // tabPageFamiglie
@@ -1636,7 +1636,7 @@ namespace viewer {
             this.tabPageFamiglie.Location = new System.Drawing.Point(4, 25);
             this.tabPageFamiglie.Name = "tabPageFamiglie";
             this.tabPageFamiglie.Padding = new System.Windows.Forms.Padding(3);
-            this.tabPageFamiglie.Size = new System.Drawing.Size(458, 867);
+            this.tabPageFamiglie.Size = new System.Drawing.Size(415, 867);
             this.tabPageFamiglie.TabIndex = 2;
             this.tabPageFamiglie.Text = "Fam";
             this.tabPageFamiglie.UseVisualStyleBackColor = true;
@@ -1651,7 +1651,7 @@ namespace viewer {
             this.txtFamiglie.Multiline = true;
             this.txtFamiglie.Name = "txtFamiglie";
             this.txtFamiglie.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.txtFamiglie.Size = new System.Drawing.Size(452, 861);
+            this.txtFamiglie.Size = new System.Drawing.Size(409, 861);
             this.txtFamiglie.TabIndex = 24;
             // 
             // tabPage6
@@ -1669,7 +1669,7 @@ namespace viewer {
             this.tabPage6.Location = new System.Drawing.Point(4, 25);
             this.tabPage6.Name = "tabPage6";
             this.tabPage6.Padding = new System.Windows.Forms.Padding(3);
-            this.tabPage6.Size = new System.Drawing.Size(458, 867);
+            this.tabPage6.Size = new System.Drawing.Size(415, 867);
             this.tabPage6.TabIndex = 3;
             this.tabPage6.Text = "Task";
             this.tabPage6.UseVisualStyleBackColor = true;
@@ -1784,7 +1784,7 @@ namespace viewer {
             this.tabImmagine.Location = new System.Drawing.Point(4, 25);
             this.tabImmagine.Name = "tabImmagine";
             this.tabImmagine.Padding = new System.Windows.Forms.Padding(3);
-            this.tabImmagine.Size = new System.Drawing.Size(458, 867);
+            this.tabImmagine.Size = new System.Drawing.Size(415, 867);
             this.tabImmagine.TabIndex = 4;
             this.tabImmagine.Text = "Pic";
             this.tabImmagine.UseVisualStyleBackColor = true;
@@ -1893,7 +1893,7 @@ namespace viewer {
             this.tabPage7.Controls.Add(this.label28);
             this.tabPage7.Location = new System.Drawing.Point(4, 25);
             this.tabPage7.Name = "tabPage7";
-            this.tabPage7.Size = new System.Drawing.Size(458, 867);
+            this.tabPage7.Size = new System.Drawing.Size(415, 867);
             this.tabPage7.TabIndex = 5;
             this.tabPage7.Text = "Long";
             this.tabPage7.UseVisualStyleBackColor = true;

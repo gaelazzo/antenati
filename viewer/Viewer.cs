@@ -16,6 +16,7 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Security;
+using System.Reflection;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
@@ -23,6 +24,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.Xml.Linq;
 using Control = System.Windows.Forms.Control;
 
 
@@ -39,17 +41,20 @@ namespace viewer {
 		int BASE_HEIGTH = 1200;
 
 		int currImageWidth = 1000;
+        string extendCode(string code) {
+            return  Regex.Replace(code, "([A-Z])", "_$1");
+        }
 
-		/// <summary>
-		/// Gets the path for the image of a specified code in the current register
-		/// </summary>
-		/// <param name="code"></param>
-		/// <returns></returns>
-		string PathFromCode(string code) {
+        /// <summary>
+        /// Gets the path for the image of a specified code in the current register
+        /// </summary>
+        /// <param name="code"></param>
+        /// <returns></returns>
+        string PathFromCode(string code) {
             if (getCurrRegister() == null)
                 return null;
             string fName = code + ".jpg";
-            fName = Regex.Replace(fName, "([A-Z])", "_$1");
+            fName = extendCode(fName);
             string fPath = Path.Combine("data",  fName); //getCurrRegister().idRegistro,
 			return fPath;
         }
@@ -61,10 +66,10 @@ namespace viewer {
         }
         string getImageUrlByCode(string code, int width) {
 			// {scheme}://{server}/iiif/2/{identifier}/{region}/{size}/{rotation}/{quality}.{format}
-			//return "https://iiif-antenati.cultura.gov.it/iiif/2/" + code + "/full/full/0/default.jpg";
+			return "https://iiif-antenati.cultura.gov.it/iiif/2/" + code + "/full/max/0/default.jpg";
 			// https://iiif-antenati.cultura.gov.it/iiif/2/5VrBEzV/0,2048,1024,518/1024,/0/default.jpg
 
-			return $"https://iiif-antenati.cultura.gov.it/iiif/2/{code}/full/{width},/0/default.jpg";
+			//return $"https://iiif-antenati.cultura.gov.it/iiif/2/{code}/full/{width},/0/default.jpg";
 
 		}
 
@@ -149,6 +154,17 @@ namespace viewer {
 
         public Viewer() {
             InitializeComponent();
+            // Enable double-buffering on picture and panel to reduce flicker during zoom/pan
+            try {
+                typeof(Control).GetProperty("DoubleBuffered", BindingFlags.NonPublic | BindingFlags.Instance)
+                    .SetValue(pic, true, null);
+                typeof(Control).GetProperty("DoubleBuffered", BindingFlags.NonPublic | BindingFlags.Instance)
+                    .SetValue(imgPanel, true, null);
+                this.SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint, true);
+                this.UpdateStyles();
+            }
+            catch {
+            }
 			PageLoader.getResponseMessage("https://antenati.cultura.gov.it/");
             PageLoader.getResponseMessage("https://analytics-icar.cultura.gov.it/matomo.js");
 			PageLoader.getResponseMessage("https://www.googletagmanager.com/gtag/js?id=G-HPLTCJ58MW");
@@ -168,7 +184,7 @@ namespace viewer {
 
             var files = Directory.EnumerateFiles("data", "*.*", SearchOption.AllDirectories);
             foreach (var f in files) {
-                savedFiles.Add(Path.Combine(Path.GetFileNameWithoutExtension(f)));
+                savedFiles.Add(Path.GetFileNameWithoutExtension(f));
             }
 
             pic.SizeMode = PictureBoxSizeMode.AutoSize;
@@ -530,7 +546,7 @@ namespace viewer {
 			foreach (string file in files) {
 				try {
 					File.Delete(file);
-                    savedFiles.Remove(file);
+                    savedFiles.Remove(Path.GetFileNameWithoutExtension(file));
                     esistenti.Remove(file);
 					Console.WriteLine($"Cancellato: {Path.GetFileName(file)}");
 				}
@@ -540,13 +556,33 @@ namespace viewer {
 			}
 		}
 
-		/// <summary>
-		/// Carica l'immagine corrispondente al codice specificato e la aggiunge a esistenti e savedFiles
-		/// </summary>
-		/// <param name="code"></param>
-		/// <param name="width"></param>
-		/// <returns></returns>
-		string loadImage(string code, int width) {
+        static Bitmap LoadBitmapUnlocked(string path) {
+            for (int i = 0; i < 3; i++) {
+                try {
+                    using (var stream = new FileStream(
+                        path,
+                        FileMode.Open,
+                        FileAccess.Read,
+                        FileShare.ReadWrite))
+                    using (var img = Image.FromStream(stream)) {
+                        return new Bitmap(img);
+                    }
+                }
+                catch {
+                    Thread.Sleep(10);
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Carica l'immagine corrispondente al codice specificato e la aggiunge a esistenti e savedFiles
+        /// </summary>
+        /// <param name="code"></param>
+        /// <param name="width"></param>
+        /// <returns></returns>
+        string loadImage(string code, int width) {
             if (checkError(code))
                 return null;
             if (!pageDecode.ContainsKey(code))
@@ -554,8 +590,8 @@ namespace viewer {
             int num = pageDecode[code];
             string codePrec = mapPage[num];
             string fPath = PathFromCode(code);
-            if (savedFiles.Contains(fPath)) {
-                Console.WriteLine($"File {fPath} già presente in savedFiles");
+            if (savedFiles.Contains(extendCode(code))) {
+                Console.WriteLine($"File {code} già presente in savedFiles come {extendCode(code)}");
 				return fPath;
 			}
             
@@ -575,14 +611,11 @@ namespace viewer {
                         return null;
                     }
 
-					Image imageToDisplay;
-					using (var fs = new FileStream(fPath, FileMode.Open, FileAccess.Read)) {
-						imageToDisplay = Image.FromStream(fs);
-					}					
+					Image img = LoadBitmapUnlocked(fPath);
 
-                    if (imageToDisplay.Height < 100 || imageToDisplay.Width < 100) {
+                    if (img?.Height < 100 || img?.Width < 100) {
                         removeRequest(code);
-						imageToDisplay.Dispose();
+                        img.Dispose();
 						return null;
                     }
                     if (num > 0) {
@@ -591,8 +624,8 @@ namespace viewer {
                         if (File.Exists(fPathPrec)) {
                             var fPrec = new FileInfo(fPathPrec);
                             if (fPrec.Length < f.Length) {
-                                if (savedFiles.Contains(codePrec.ToString()))
-                                    savedFiles.Remove(codePrec.ToString());
+                                if (savedFiles.Contains(extendCode(codePrec)))
+                                    savedFiles.Remove(extendCode(codePrec));
                                 File.Delete(fPathPrec);
                             }
                         }
@@ -601,9 +634,9 @@ namespace viewer {
 
                     esistenti.Add(PathFromCode(code));
 
-                    imageToDisplay.Dispose();
+                    img.Dispose();
 
-                    savedFiles.Add(PathFromCode(code));
+                    savedFiles.Add(extendCode(code));
 
                     removeRequest(code);
                 }
@@ -625,11 +658,14 @@ namespace viewer {
             }
         }
 
+        
+
         int xScroll = 0;
         int yScroll = 0;
-        int zoom = 0;
         int lastImageWidth = 0;
 		int lastImageHeigth = 0;
+        
+        /*
         bool isZoomAllowed(int zoom) {
 			var zoomFactor = Convert.ToDouble(zoom) / 1000.0;
 
@@ -646,31 +682,45 @@ namespace viewer {
 		}
 		void recalculateCurrentImageWidth(int zoom) {
 			var zoomFactor = Convert.ToDouble(zoom) / 1000.0;
-			//Size newSize = new Size((int)(Math.Round(Convert.ToDouble(lastImageWidth * zoomFactor))),
-			//		(int)(Math.Round(Convert.ToDouble(lastImageHeigth * zoomFactor))));
-			//currImageWidth = newSize.Width;
 			currImageWidth = (int)Math.Round(BASE_WIDTH * zoomFactor);
             deleteCache();            
 		}
 
+        */
+
 		int prevWidth = 0;
 		int prevHeight = 0;
 
+        float GetFitZoom(Image img) {
+            if (img == null)
+                return 1f;
+
+            float zoomX = imgPanel.ClientSize.Width / (float)img.Width;
+            float zoomY = imgPanel.ClientSize.Height / (float)img.Height;
+
+            return Math.Min(zoomX, zoomY);
+        }
+
+        Image baseImage;   // originale da disco
+        Image renderImage; // zoomata
+
         void displayImage(Image imgBase) {
-            if (drawing)
+            if (drawing) {
+                Console.WriteLine("skipping because already drawing");
                 return;
+            }
             drawing = true;
 
-			Image oldImage = null;
+            int baseWidth = imgBase?.Width ?? 0;
+            int baseHeight = imgBase?.Height ?? 0;
+
+            Image oldImage = null;
 
 			bool thereWasImage = (lastImage != null);
             if (imgBase != null && lastImage != imgBase) {
 				oldImage = lastImage;				 
                 lastImage = imgBase;
             }
-            //else {
-            //    imgBase = lastImage;
-            //}
 
             if (imgBase == null) {
 				lastImage?.Dispose();
@@ -681,13 +731,6 @@ namespace viewer {
             }
 
             try {
-                //            trackZoom.Value = zoom;
-                //            var zoomFactor = Convert.ToDouble(zoom) / 1000.0;
-                //            lastImageWidth = (int)(Math.Round(Convert.ToDouble(imgBase.Width * zoomFactor)));
-                //            lastImageHeigth = (int)(Math.Round(Convert.ToDouble(imgBase.Height * zoomFactor)));
-                //Size newSize = new Size(lastImageWidth, lastImageHeigth);
-                //            var img = new Bitmap(imgBase, newSize);
-
 
                 if (chkContrast.Checked) {
                     processImage((Bitmap)imgBase, contrastBar.Value);                ///img
@@ -703,24 +746,47 @@ namespace viewer {
                     lastXRate = xScroll / (double)prevWidth;
                     lastYRate = yScroll / (double)prevHeight;
                 }
+                float zoomFactor = GetFitZoom(imgBase) * userZoom;
 
-                //pic.Image?.Dispose();
                 // 2. Sostituisco immagine
-                lastImage = imgBase;
-                pic.Image = imgBase;
-				oldImage?.Dispose();
+                Image rendered = imgBase;
+                if (zoomFactor != 1.0f) {
+                    int w = (int)(imgBase.Width * zoomFactor);
+                    int h = (int)(imgBase.Height * zoomFactor);
+
+                    rendered = new Bitmap(imgBase, new Size(w, h));
+                }
+                var renderWidth = rendered.Width;
+                var renderHeight = rendered.Height;
+
+                if (!ReferenceEquals(pic.Image, rendered)) {
+                    var old = pic.Image;
+                    pic.Image = null;
+                    pic.Image = rendered;
+                    old?.Dispose();
+                    pic.Invalidate();
+                    pic.Update();
+                }
+                else {
+                    pic.Refresh();
+                }
+
+                // lastImage = rendered;
+               
                 Console.WriteLine("Nuova immagine visualizzata");
 				// 3. Ripristino lo scroll
 				if (thereWasImage) {
-					xScroll = (int)Math.Round(lastXRate * pic.Image.Width);
-					yScroll = (int)Math.Round(lastYRate * pic.Image.Height);
+                    xScroll = (int)Math.Round(lastXRate * renderWidth);
+                    yScroll = (int)Math.Round(lastYRate * renderHeight);
 
-					xScroll = Math.Max(imgPanel.HorizontalScroll.Minimum, Math.Min(xScroll, imgPanel.HorizontalScroll.Maximum));
+
+                    xScroll = Math.Max(imgPanel.HorizontalScroll.Minimum, Math.Min(xScroll, imgPanel.HorizontalScroll.Maximum));
 					yScroll = Math.Max(imgPanel.VerticalScroll.Minimum, Math.Min(yScroll, imgPanel.VerticalScroll.Maximum));
 
                     imgPanel.HorizontalScroll.Value = xScroll;
                     imgPanel.VerticalScroll.Value = yScroll;
                 }
+                pic.Refresh();
             }
             catch (Exception e) {
                 string err = e.ToString();
@@ -1031,7 +1097,7 @@ namespace viewer {
 
                             try {
                                 if (saved == currentImage) {
-                                    imageToDisplay = Image.FromFile(fPath);
+                                    imageToDisplay = LoadBitmapUnlocked(fPath);
                                     nEffettivo = saved;
                                 }
                             }
@@ -1193,21 +1259,30 @@ namespace viewer {
 
         private void trackZoom_ValueChanged(object sender, EventArgs e) {
 
-            zoom = trackZoom.Value;
-            //displayImage(null);
+            userZoom = trackZoom.Value / 1000f;
+            //recalculateCurrentImageWidth(trackZoom.Value);
+            //reloadImage();
+            //displayImage(lastImage);
+            displayImage(lastImage);
         }
+        float userZoom = 1.0f;
+        
 
-       
-		void zoomStepIn() {
+        void zoomStepIn() {
             try {
-                if (trackZoom.Value + 100 > trackZoom.Minimum && isZoomAllowed(trackZoom.Value-100)) {
-					trackZoom.Value += 100;
-					displayImage(null);
-					recalculateCurrentImageWidth(trackZoom.Value);
-                    reloadImage();
+                if (trackZoom.Value + 100 < trackZoom.Maximum) { //&& isZoomAllowed(trackZoom.Value+100
+                    trackZoom.Value += 100;
+                    //displayImage(null);
+                    //recalculateCurrentImageWidth(trackZoom.Value);
+                    //reloadImage();
+                    //zoomFactor = trackZoom.Value / 1000f;
+                    //displayImage(lastImage);
 
-				}
-                    
+                }
+                else {
+                    trackZoom.Value = trackZoom.Maximum;
+                }
+
             }
             catch {
 
@@ -1215,12 +1290,18 @@ namespace viewer {
         }
         void zoomStepOut() {
             try {
-                if (trackZoom.Value - 100 > trackZoom.Minimum && isZoomAllowed(trackZoom.Value - 100)) {
-					trackZoom.Value -= 100;
-					displayImage(null);
-					recalculateCurrentImageWidth(trackZoom.Value);
-					reloadImage();
-				}
+                if (trackZoom.Value - 100 > trackZoom.Minimum) {  //&& isZoomAllowed(trackZoom.Value - 100)
+
+                    trackZoom.Value -= 100;
+                    //displayImage(null);
+                    //recalculateCurrentImageWidth(trackZoom.Value);
+                    //reloadImage();
+                    //zoomFactor = trackZoom.Value / 1000f;
+                    //displayImage(lastImage);
+                }
+                else {
+                    trackZoom.Value = trackZoom.Minimum;
+                }
                     
             }
             catch {
@@ -1348,7 +1429,6 @@ namespace viewer {
                 Directory.CreateDirectory(folder);
             }
 
-
             string fileName = Path.GetTempPath() + Guid.NewGuid().ToString() + ".jpg";
             try {
 
@@ -1360,25 +1440,9 @@ namespace viewer {
 				currExploring = url;
                 Console.WriteLine($"Richiedo file immagine {url}");
 				Dictionary<string, string> cookies = new Dictionary<string, string>();
-    //            var _ga = PageLoader.getCookie("_ga");  //GA1.1.1208148208.1762619312
-				//var _gid = PageLoader.getCookie("_ga_HPLTCJ58MW");
-
-    //            if (_ga == null) {
-    //                return false;
-    //            }
-				//Console.WriteLine("Reading address " + url);
-				//cookies.Add("_ga", _ga);
-				//cookies.Add("_ga_HPLTCJ58MW", _gid);  //GS2.1.s1762619311$o1$g1$t1762622216$j58$l0$h0
-				//cookies.Add("_ga", "GA1.1.1208148208.1762619312");
-				//cookies.Add("_ga_HPLTCJ58MW", "GS2.1.s1762676767$o4$g1$t1762676853$j59$l0$h0");  //GS2.1.s1762619311$o1$g1$t1762622216$j58$l0$h0
-
 
 				Dictionary<string, string> headers = new Dictionary<string, string>();
-                //headers.Add("Accept", "*/*");
                 headers.Add("Accept-Encoding", "gzip, deflate");
-                //headers.Add("Accept-Language", "it,en-US;q=0.9,en;q=0.8");
-                //headers.Add("Origin", "https://antenati.cultura.gov.it");
-                //headers.Add("Priority", "u=1, i");
                 headers.Add("Referer", "https://antenati.cultura.gov.it");
 
 				headers.Add("Sec-Ch-Ua", @"""Chromium"";v=""142"", ""Google Chrome"";v=""142"", ""Not?A_Brand"";v=""99""");
@@ -1388,9 +1452,6 @@ namespace viewer {
 				headers.Add("Sec-Fetch-Mode", "cors");
 				headers.Add("Sec-Fetch-Site", "same-site");
 				//headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36");
-
-
-				
 
 				var response = PageLoader.getResponseMessage(url, HttpCompletionOption.ResponseContentRead, headers, cookies);
 
@@ -1403,11 +1464,10 @@ namespace viewer {
 						stream.CopyTo(fs);
 					}
 				}
-
 				
                 var f = new FileInfo(fileName);
                 if (f.Length > 10000) {
-                    System.IO.File.Copy(fileName, path);
+                    System.IO.File.Copy(fileName, path,true);
                 }
                 System.IO.File.Delete(fileName);
                 if (currExploring == url)
@@ -1591,8 +1651,8 @@ namespace viewer {
                         txtAddress.Text = pieces[1];
                     }
                     if (pieces[0] == "zoom") {
-                        zoom = Convert.ToInt32(pieces[1]);
-                        trackZoom.Value = zoom;
+                        userZoom = Convert.ToInt32(pieces[1]) / 100f;
+                        trackZoom.Value = Convert.ToInt32(pieces[1]);
                     }
                     if (pieces[0] == "lastScrollX") {
                         xScroll = Convert.ToInt32(pieces[1]);
@@ -2777,24 +2837,22 @@ namespace viewer {
                         if (savedFiles.Contains(fPath.Replace("data\\", "").Replace(".jpg", ""))) {
                             savedFiles.Remove(fPath.Replace("data\\", "").Replace(".jpg", ""));
                         }
-
                         System.IO.File.Delete(fPath);
                         continue;
                     }
 
 
-                    var imageToDisplay = Image.FromFile(fPath);
-                    if (imageToDisplay.Height < 1000 || imageToDisplay.Width < 1000) {
-                        imageToDisplay.Dispose();
+                    var img = LoadBitmapUnlocked(fPath);
+                    if (img?.Height < 1000 || img?.Width < 1000) {
+                        img.Dispose();
                         if (savedFiles.Contains(fPath.Replace("data\\", "").Replace(".jpg", ""))) {
                             savedFiles.Remove(fPath.Replace("data\\", "").Replace(".jpg", ""));
                         }
-
                         System.IO.File.Delete(fPath);
                         continue;
                     }
 
-                    imageToDisplay.Dispose();
+                    img.Dispose();
 
                 }
 
@@ -3025,8 +3083,9 @@ namespace viewer {
 
         void reloadImage() {
             int n = getNum();
-            viewImage(n);
-		}
+            // Load image asynchronously to avoid blocking UI thread during zoom changes
+            viewImage(n); 
+        }
 
 		/// <summary>
 		/// Carica e visualizza l'immagine n-esima con la dimensione corrente
@@ -3040,14 +3099,13 @@ namespace viewer {
             if (fPath == null) {
                 return;
             }
-            imageToDisplay = Image.FromFile(fPath);
+            imageToDisplay = LoadBitmapUnlocked(fPath);
 
-            if (imageToDisplay == null)
-                return;
+            if (imageToDisplay == null) return;
             if (chkContrast.Checked)
                 processImage((Bitmap)imageToDisplay, contrastBar.Value);
-            displayImage(imageToDisplay);
-            pic.Refresh();
+            //displayImage(imageToDisplay);
+            //pic.Refresh();
         }
 
         void reContrast() {
