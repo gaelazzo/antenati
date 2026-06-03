@@ -176,6 +176,8 @@ namespace viewer {
             this.label25 = new System.Windows.Forms.Label();
             this.txtObiettivi = new System.Windows.Forms.TextBox();
             this.tabImmagine = new System.Windows.Forms.TabPage();
+            this.label29 = new System.Windows.Forms.Label();
+            this.txtDimensione = new System.Windows.Forms.TextBox();
             this.btRotRight = new System.Windows.Forms.Button();
             this.btnRotLeft = new System.Windows.Forms.Button();
             this.btnUpsideDown = new System.Windows.Forms.Button();
@@ -846,8 +848,8 @@ namespace viewer {
             this.treeMain.TabIndex = 0;
             this.treeMain.BeforeSelect += new System.Windows.Forms.TreeViewCancelEventHandler(this.treeMain_BeforeSelect);
             this.treeMain.AfterSelect += new System.Windows.Forms.TreeViewEventHandler(this.treeMain_AfterSelect);
-            this.treeMain.DoubleClick += new System.EventHandler(this.treeMain_DoubleClick);
             this.treeMain.MouseMove += new System.Windows.Forms.MouseEventHandler(this.treeMain_MouseMove);
+            this.treeMain.MouseDown += new System.Windows.Forms.MouseEventHandler(this.treeMain_MouseDown);
             // 
             // contextMenuStrip2
             // 
@@ -1765,6 +1767,8 @@ namespace viewer {
             // 
             // tabImmagine
             // 
+            this.tabImmagine.Controls.Add(this.label29);
+            this.tabImmagine.Controls.Add(this.txtDimensione);
             this.tabImmagine.Controls.Add(this.btRotRight);
             this.tabImmagine.Controls.Add(this.btnRotLeft);
             this.tabImmagine.Controls.Add(this.btnUpsideDown);
@@ -1788,6 +1792,24 @@ namespace viewer {
             this.tabImmagine.TabIndex = 4;
             this.tabImmagine.Text = "Pic";
             this.tabImmagine.UseVisualStyleBackColor = true;
+            // 
+            // label29
+            // 
+            this.label29.AutoSize = true;
+            this.label29.Location = new System.Drawing.Point(17, 301);
+            this.label29.Name = "label29";
+            this.label29.Size = new System.Drawing.Size(82, 17);
+            this.label29.TabIndex = 51;
+            this.label29.Text = "DImensione";
+            this.label29.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
+            // 
+            // txtDimensione
+            // 
+            this.txtDimensione.Location = new System.Drawing.Point(106, 298);
+            this.txtDimensione.Name = "txtDimensione";
+            this.txtDimensione.Size = new System.Drawing.Size(100, 23);
+            this.txtDimensione.TabIndex = 50;
+            this.txtDimensione.TextChanged += new System.EventHandler(this.txtDimensione_TextChanged);
             // 
             // btRotRight
             // 
@@ -2362,6 +2384,8 @@ namespace viewer {
         private System.Windows.Forms.TextBox txtLongFam;
         private System.Windows.Forms.CheckBox chkFullKey;
 		private System.Windows.Forms.CheckBox chkSerial;
-	}
+        private System.Windows.Forms.Label label29;
+        private System.Windows.Forms.TextBox txtDimensione;
+    }
 }
 

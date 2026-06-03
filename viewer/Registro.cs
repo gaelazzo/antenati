@@ -112,7 +112,7 @@ namespace viewer {
             string json = JsonConvert.SerializeObject(registri, Formatting.Indented);
 
             // Salva il JSON nel file specificato
-            File.WriteAllText(filePath, json);
+            SafeFile.WriteAllText(filePath, json);
         }
         public static List<IArchiveNode> deriveRegistroFromPage(string anno, string idSerie,string kind, string url) {
             List<IArchiveNode> res = new List<IArchiveNode>();

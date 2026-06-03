@@ -1,0 +1,29 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            // Build con la MSBuild COMPLETA di Visual Studio (gestisce packages.config,
+            // cosa che 'dotnet build' non fa sui progetti vecchio stile).
+            // Se sposti/aggiorni VS, correggi solo questo path.
+            "label": "build",
+            "type": "process",
+            "command": "C:\\Program Files\\Microsoft Visual Studio\\18\\Professional\\MSBuild\\Current\\Bin\\MSBuild.exe",
+            "args": [
+                "${workspaceFolder}\\viewer\\viewer.csproj",
+                "/t:Build",
+                "/p:Configuration=Debug",
+                "/v:minimal",
+                "/nologo"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": "$msCompile",
+            "presentation": {
+                "reveal": "silent",
+                "clear": true
+            }
+        }
+    ]
+}

@@ -86,7 +86,7 @@ Regex regex = new Regex(pattern);
             string json = JsonConvert.SerializeObject(series, Formatting.Indented);
 
             // Salva il JSON nel file specificato
-            File.WriteAllText(filePath, json);
+            SafeFile.WriteAllText(filePath, json);
         }
         
 

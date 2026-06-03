@@ -1,0 +1,22 @@
+{
+    // .NET Framework 4.8 WinForms -> debugger desktop CLR (type: "clr"), NON coreclr.
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Avvia Viewer (.NET Framework)",
+            "type": "clr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/viewer/bin/Debug/viewer.exe",
+            "args": [],
+            // IMPORTANTE: working dir = bin\Debug, dove stanno i JSON/appunti e la cartella important.
+            "cwd": "${workspaceFolder}/viewer/bin/Debug",
+            "stopAtEntry": false
+        },
+        {
+            "name": "Attach a processo (.NET Framework)",
+            "type": "clr",
+            "request": "attach"
+        }
+    ]
+}

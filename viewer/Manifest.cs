@@ -160,7 +160,7 @@ namespace viewer {
 
             //await m.GetAllImageSizesAsync(imageIds);
 			string jsonData = JsonConvert.SerializeObject(m, Formatting.Indented);
-            File.WriteAllText(filename, jsonData);
+            SafeFile.WriteAllText(filename, jsonData);
             m.pageDecode = pageDecode;
             allManifest[manifestId] = m;
             return m;

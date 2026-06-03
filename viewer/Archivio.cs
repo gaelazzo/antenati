@@ -62,7 +62,7 @@ namespace viewer {
             string json = JsonConvert.SerializeObject(archivi, Formatting.Indented);
 
             // Salva il JSON nel file specificato
-            File.WriteAllText(filePath, json);
+            SafeFile.WriteAllText(filePath, json);
         }
 
         public static void read(string dummy) {

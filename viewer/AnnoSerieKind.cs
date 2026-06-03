@@ -88,7 +88,7 @@ namespace viewer {
             string json = JsonConvert.SerializeObject(annoSeriesKind, Formatting.Indented);
 
             // Salva il JSON nel file specificato
-            File.WriteAllText(filePath, json);
+            SafeFile.WriteAllText(filePath, json);
         }
 
         public static List<IArchiveNode> deriveKindFromRegistroPage(string anno, string idSerie, string html, string url) {

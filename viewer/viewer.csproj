@@ -286,6 +286,7 @@
     <Compile Include="Manifest.cs" />
     <Compile Include="PageLoader.cs" />
     <Compile Include="RegNode.cs" />
+    <Compile Include="SafeFile.cs" />
     <Compile Include="Viewer.cs">
       <SubType>Form</SubType>
     </Compile>

@@ -64,7 +64,7 @@ namespace viewer {
             string json = JsonConvert.SerializeObject(fondi, Formatting.Indented);
 
             // Salva il JSON nel file specificato
-            File.WriteAllText(filePath, json);
+            SafeFile.WriteAllText(filePath, json);
         }
         
         public static List<IArchiveNode> read(string idArchivio) {

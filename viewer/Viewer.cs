@@ -64,14 +64,15 @@ namespace viewer {
                 existingRequests.Add(PathFromCode(code));
             }
         }
-        string getImageUrlByCode(string code, int width) {
+        string getImageUrlByCode(string code) {
 			// {scheme}://{server}/iiif/2/{identifier}/{region}/{size}/{rotation}/{quality}.{format}
-			return "https://iiif-antenati.cultura.gov.it/iiif/2/" + code + "/full/max/0/default.jpg";
-			// https://iiif-antenati.cultura.gov.it/iiif/2/5VrBEzV/0,2048,1024,518/1024,/0/default.jpg
+            if (dimension == 0) return "https://iiif-antenati.cultura.gov.it/iiif/2/" + code + "/full/max/0/default.jpg";
+            return $"https://iiif-antenati.cultura.gov.it/iiif/2/{code}/full/{dimension},/0/default.jpg";
+            // https://iiif-antenati.cultura.gov.it/iiif/2/5VrBEzV/0,2048,1024,518/1024,/0/default.jpg
 
-			//return $"https://iiif-antenati.cultura.gov.it/iiif/2/{code}/full/{width},/0/default.jpg";
+            //return $"https://iiif-antenati.cultura.gov.it/iiif/2/{code}/full/{width},/0/default.jpg";
 
-		}
+        }
 
 		void removeRequest(string code) {
             lock (hashSemaphore) {
@@ -414,36 +415,36 @@ namespace viewer {
             var segments = uri.Segments;
             if (segments.Length > 4) { // Il segmento aggiuntivo è presente
                 string lastSegment = segments[segments.Length - 1]; // Ottieni l'ultimo segmento
-                return setPageByCode(lastSegment, currImageWidth);
+                return await setPageByCode(lastSegment);
             }
             else { // L'URL termina senza il segmento aggiuntivo
-                return setPageByNumber(1, currImageWidth);
+                return await setPageByNumber(1);
             }
         }
 
 
-        string setPageByCode(string code, int width) {
+        async Task<string> setPageByCode(string code) {
             if (pageDecode.ContainsKey(pageCode)) {
                 pageCode = code;
                 pageNumber = pageDecode[pageCode];
-                return loadJpg(pageCode, width);
+                return await loadJpg(pageCode);
             }
             return pageCode;
         }
 
-        string setPageByNumber(int nPage, int width) {
+        async Task<string> setPageByNumber(int nPage) {
 
             if (mapPage.ContainsKey(nPage)) {
                 pageNumber = nPage;
                 pageCode = mapPage[pageNumber];
-                return loadJpg(pageCode, width);
+                return await loadJpg(pageCode);
             }
             return null;
         }
 
-        string loadJpg(string code, int width) {
-			var imgUrl = getImageUrlByCode(code, width);
-			return loadImage(imgUrl,width);
+        async Task<string> loadJpg(string code) {
+			var imgUrl = getImageUrlByCode(code);
+			return await loadImage(imgUrl);
 
         }
 
@@ -499,7 +500,7 @@ namespace viewer {
                 },curr).Start();
                 */
 				currPrecaching = curr;
-                if (loadImage(mapPage[curr], currImageWidth) == null)
+                if (loadImage(mapPage[curr]) == null)
                     break;
                 curr += step;
 
@@ -533,11 +534,11 @@ namespace viewer {
 		/// </summary>
 		/// <param name="num"></param>
 		/// <returns></returns>
-		string loadImage(int num) {
+		async Task<string> loadImage(int num) {
             if (!mapPage.ContainsKey(num)) {
                 return null;
             }
-            return loadImage(mapPage[num], currImageWidth);
+            return await loadImage(mapPage[num]);
         }
 
         void deleteCache() {
@@ -582,7 +583,7 @@ namespace viewer {
         /// <param name="code"></param>
         /// <param name="width"></param>
         /// <returns></returns>
-        string loadImage(string code, int width) {
+        async Task<string> loadImage(string code) {
             if (checkError(code))
                 return null;
             if (!pageDecode.ContainsKey(code))
@@ -599,7 +600,7 @@ namespace viewer {
                 if (!checkFileRequestExists(code)) {
                     addRequest(code);
                     Console.WriteLine($"Aggiungo in coda richiesta per {code}");
-                    if (!queueDownloadFile(code, width, fPath, false)) {
+                    if (!await queueDownloadFile(code,  fPath, false)) {
                         removeRequest(code);
                         return null;
                     }
@@ -976,7 +977,7 @@ namespace viewer {
         }
 
         private int nExploring = 0;
-        Semaphore Sdownload = new Semaphore(3, 3);
+        Semaphore Sdownload = new Semaphore(5,20);
         //private TreeNode waitingToGo = null;
         private int currentImage = 0;
         private bool inTimer = false;
@@ -1082,13 +1083,13 @@ namespace viewer {
                 }
 
                 //tabControl1.SelectedTab = tabPage1;
-                new Task(() => {
+                new Task(async () => {
                     string fPath;
                     try {
                         if (mapPage.ContainsKey(requestedImage)) {
                             int saved = requestedImage;
                             startPrecache(currentImage + standardStep, true);
-                            fPath = loadImage(mapPage[saved], currImageWidth);
+                            fPath = await loadImage(mapPage[saved]);
                             if (fPath == null) {
                                 updating = false;
                                 toMarkImportant = false;
@@ -1357,7 +1358,7 @@ namespace viewer {
             DialogResult res = saveFileDialog1.ShowDialog();
             if (res != DialogResult.OK)
                 return;
-            System.IO.File.Copy(loadImage(getNum()), saveFileDialog1.FileName, true);
+            System.IO.File.Copy(loadImage(getNum()).GetAwaiter().GetResult(), saveFileDialog1.FileName, true);
         }
 
         HashSet<string> savedFiles = new HashSet<string>();
@@ -1422,7 +1423,7 @@ namespace viewer {
         //}
 
 
-        public bool queueDownloadFile(string code, int width, string path, bool forced = true) {
+        public async Task<bool> queueDownloadFile(string code,  string path, bool forced = true) {
             WebClient w = null;
             string folder = Path.GetDirectoryName(path);
             if (!Directory.Exists(folder)) {
@@ -1436,7 +1437,7 @@ namespace viewer {
                     Sdownload.WaitOne();
 
 
-                string url =getImageUrlByCode(code, width);  //  "https://iiif-antenati.cultura.gov.it/iiif/2/LPbBpOd/full/956,/0/default.jpg"
+                string url =getImageUrlByCode(code);  //  "https://iiif-antenati.cultura.gov.it/iiif/2/LPbBpOd/full/956,/0/default.jpg"
 				currExploring = url;
                 Console.WriteLine($"Richiedo file immagine {url}");
 				Dictionary<string, string> cookies = new Dictionary<string, string>();
@@ -1459,20 +1460,56 @@ namespace viewer {
 					Console.WriteLine($"HTTP Error {(int?)response?.StatusCode}: {response?.ReasonPhrase}");
 					return false;
 				}
-				using (var fs = new FileStream(fileName, FileMode.Create, FileAccess.Write)) {
-					using (var stream = response.Content.ReadAsStreamAsync().Result) {
-						stream.CopyTo(fs);
-					}
-				}
-				
-                var f = new FileInfo(fileName);
-                if (f.Length > 10000) {
-                    System.IO.File.Copy(fileName, path,true);
+                // Verifica Content-Length se disponibile
+                long? expectedLength = response.Content.Headers.ContentLength;
+                Console.WriteLine($"Expected size: {expectedLength?.ToString() ?? "unknown"}");
+
+                // Leggi tutto in memoria prima
+                byte[] fileBytes = await response.Content.ReadAsByteArrayAsync();
+
+                using (var fs = new FileStream(fileName, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true)) {
+                    using (var stream = await response.Content.ReadAsStreamAsync()) {
+                        await stream.CopyToAsync(fs);
+                        await fs.FlushAsync();
+                    }
                 }
+
+                var f = new FileInfo(fileName);
+                Console.WriteLine($"Actual size: {f.Length}");
+                if (expectedLength.HasValue && f.Length != expectedLength.Value) {
+                    Console.WriteLine($"WARNING: Size mismatch! Expected {expectedLength}, got {f.Length}");
+                    return false;
+                }
+
+                bool result = false;
+                if (f.Length > 10000) {
+                    // Verifica che il file non sia corrotto (es. immagine HTML di errore)
+                    byte[] header = new byte[Math.Min(100, f.Length)];
+                    using (var fs = new FileStream(fileName, FileMode.Open, FileAccess.Read)) {
+                        await fs.ReadAsync(header, 0, header.Length);
+                    }
+
+                    // Controlla se è HTML (errore) invece di un'immagine
+                    string textHeader = System.Text.Encoding.ASCII.GetString(header);
+                    if (textHeader.Contains("<html") || textHeader.Contains("<!DOCTYPE")) {
+                        Console.WriteLine("Server returned HTML error page instead of image");                      
+                    }
+                    else {
+                        File.Copy(fileName, path, true);
+                        result = true;
+                    }
+                }
+                else {
+                    Console.WriteLine($"File too small: {f.Length} bytes - {fileName}");
+                    // Leggi il contenuto per debug
+                    string content = File.ReadAllText(fileName);
+                    Console.WriteLine($"Content: {content.Substring(0, Math.Min(200, content.Length))}");
+                }
+
                 System.IO.File.Delete(fileName);
                 if (currExploring == url)
                     currExploring = "";
-                return true;
+                return result;
             }
             catch (Exception e) {
                 string eee = e.ToString();
@@ -1529,6 +1566,7 @@ namespace viewer {
             s.AppendLine("split§" + this.splitContainer1.SplitterDistance);
 
             s.AppendLine("zoom§" + trackZoom.Value);
+            s.AppendLine("dimension§" + dimension);
 
             s.AppendLine("registro§" + idRegistro);
 
@@ -1586,7 +1624,7 @@ namespace viewer {
         }
 
 
-        void readStartValues() {
+        async Task readStartValues() {
             int x = 0, y = 0;
             if (System.IO.File.Exists("start.txt")) {
                 var n = System.IO.File.ReadAllText("start.txt");
@@ -1598,7 +1636,7 @@ namespace viewer {
                     string[] pieces = line.Split('§');
                     if (pieces[0] == "pageNum") {
                         txtPageNum.Text = pieces[1];
-                        viewImage(Convert.ToInt32(pieces[1]));
+                        await viewImage(Convert.ToInt32(pieces[1]));
                     }
                     if (pieces[0] == "mainStart") {
                         string path = pieces[1];
@@ -1606,6 +1644,7 @@ namespace viewer {
                             setNodePath(treeMain, path);
                         }
                     }
+                  
 
                     if (pieces[0] == "mainTab") {
                         string currTab = pieces[1];
@@ -1670,6 +1709,14 @@ namespace viewer {
                         this.Size = new Size(xx, yy);
                         //this.splitContainer1.Size= new Size(Convert.ToInt32(pieces[1])-28, Convert.ToInt32(pieces[2])-31);
                     }
+                    if (pieces[0] == "dimension") {
+                        string d = pieces[1];
+                        if (!string.IsNullOrEmpty(d)) {
+                            dimension = Convert.ToInt32(d);
+                            txtDimensione.Text = dimension.ToString();
+                        }
+                    }
+
                     if (pieces[0] == "split") {
                         this.splitContainer1.SplitterDistance = Convert.ToInt32(pieces[1]);
                         //this.splitContainer1.Size= new Size(Convert.ToInt32(pieces[1])-28, Convert.ToInt32(pieces[2])-31);
@@ -1709,6 +1756,7 @@ namespace viewer {
 
                 }
             }
+            
         }
         void voidStartValues() {
             if (System.IO.File.Exists("start.txt")) {
@@ -1790,7 +1838,7 @@ namespace viewer {
             for (int i = 0; i < historyList.Items.Count; i++) {
                 s.AppendLine(historyList.Items[i].ToString());
             }
-            File.WriteAllText("history.txt", s.ToString());
+            SafeFile.WriteAllText("history.txt", s.ToString());
         }
 
 
@@ -1864,7 +1912,7 @@ namespace viewer {
                 content = content.Replace("\n", "#**§");
                 s.AppendLine($"{app.Key}§{content}");
             }
-            System.IO.File.WriteAllText(fileName, s.ToString());
+            SafeFile.WriteAllText(fileName, s.ToString());
         }
         void saveAppuntiNodo() {
             GetAppuntiNodo();
@@ -1918,10 +1966,10 @@ namespace viewer {
             AnnoSerieKind.Save();
             Registro.Save();
 
-            System.IO.File.WriteAllText("indice.txt", s.ToString());
-            System.IO.File.WriteAllText("note.txt", txtGenerali.Text);
-            System.IO.File.WriteAllText("note2.txt", txtNotes2.Text);
-            System.IO.File.WriteAllText("obiettivi.txt", txtObiettivi.Text);
+            SafeFile.WriteAllText("indice.txt", s.ToString());
+            SafeFile.WriteAllText("note.txt", txtGenerali.Text);
+            SafeFile.WriteAllText("note2.txt", txtNotes2.Text);
+            SafeFile.WriteAllText("obiettivi.txt", txtObiettivi.Text);
             saveAppuntiNodo();
             saveAppuntiCitta();
             saveFamiglieCitta();
@@ -2249,7 +2297,6 @@ namespace viewer {
             }
 
             btnGoToIndex.Visible = indexAvailable;
-
         }
 
 
@@ -2262,15 +2309,10 @@ namespace viewer {
 
 
 
-        void exploreMainNode(TreeNode nn) {
+        private bool _exploring = false;
 
-            var regN = nn.Tag as RegNode;
-            pushStatus($"Explore {regN.key} {regN.title}");
-            labExplore.Text = regN.archiveNode.href;
-            labExplore.Update();
-            var nodes = regN.archiveNode.explore() ?? new List<IArchiveNode>();
-            labExplore.Text = currExploring;
-            popStatus();
+        // Aggiornamento dell'albero: gira sul thread della UI.
+        void applyChildren(TreeNode nn, RegNode regN, List<IArchiveNode> nodes) {
             if (regN.archiveNode.tipo == tipoNodo.Registro) {
                 setRegister(regN.key);
             }
@@ -2280,32 +2322,39 @@ namespace viewer {
             nn.Expand();
         }
 
-        private void treeMain_DoubleClick(object sender, EventArgs e) {
-            if (treeMain.SelectedNode == null) {
-                return;
-            }
-            exploreMainNode(treeMain.SelectedNode);
+        // SINCRONO: usato dai navigatori di percorso. Il fetch va OFF-THREAD via Task.Run: bloccare
+        // il .Result del fetch sul thread UI stalla sul SynchronizationContext (una GET da ~10ms
+        // diventa secondi). Su un thread di pool è immediato.
+        void exploreMainNode(TreeNode nn) {
+            var regN = nn.Tag as RegNode;
+            pushStatus($"Explore {regN.key} {regN.title}");
+            labExplore.Text = regN.archiveNode.href;
+            labExplore.Update();
+            var nodes = Task.Run(() => regN.archiveNode.explore() ?? new List<IArchiveNode>()).GetAwaiter().GetResult();
+            labExplore.Text = currExploring;
+            popStatus();
+            applyChildren(nn, regN, nodes);
+        }
 
-
-            /*
-            //Esplora solo se il nodo non è già associato ad un oggetto
-            waitingToGo = getAddress();
-            addAddress(waitingToGo, false);
-            exploreMainNode(treeMain.SelectedNode);
-            
-            RegNode rn = treeMain.SelectedNode.Tag as RegNode;
-            if (rn.tipo == tipoNodo.Registro) {
-                var r = Registro.registroById[rn.key];
-                setRegister(rn.key);
+        // ASINCRONO: usato dal doppio click. Fetch off-thread + guard anti-rientro (niente
+        // esplorazioni in parallelo, che il programma non gestisce).
+        async Task exploreMainNodeAsync(TreeNode nn) {
+            if (nn == null) return;
+            var regN = nn.Tag as RegNode;
+            if (regN == null || _exploring) return;
+            _exploring = true;
+            try {
+                pushStatus($"Explore {regN.key} {regN.title}");
+                labExplore.Text = regN.archiveNode.href;
+                labExplore.Update();
+                var nodes = await Task.Run(() => regN.archiveNode.explore() ?? new List<IArchiveNode>());
+                labExplore.Text = currExploring;
+                applyChildren(nn, regN, nodes);
             }
-            txtPageNum.Text = "1";
-            int num = 0;
-            if (int.TryParse(txtPageNum.Text, out num)) {
-                addToList(num);
+            finally {
+                popStatus();
+                _exploring = false;
             }
-            
-            currentImage = 0;
-            */
         }
 
         private void cancellaToolStripMenuItem_Click(object sender, EventArgs e) {
@@ -2344,6 +2393,39 @@ namespace viewer {
 
             }
 
+        }
+
+        // Rilevamento doppio click FATTO A MANO. Non possiamo fidarci di NodeMouseDoubleClick:
+        // sul doppio click "diretto" (nodo non selezionato) la selezione del 1° click fa scattare
+        // AfterSelect, che cambia focus/controlli e AZZERA il contatore di doppio click di Windows
+        // -> il 2° click arriva con CLICKS=1 e l'evento doppio click non parte. Contando noi i due
+        // click sullo stesso nodo entro la soglia di sistema, il problema sparisce.
+        private DateTime _lastDownTime = DateTime.MinValue;
+        private TreeNode _lastDownNode = null;
+        private Point _lastDownPos = Point.Empty;
+
+        private async void treeMain_MouseDown(object sender, MouseEventArgs e) {
+            if (e.Button != System.Windows.Forms.MouseButtons.Left) return;
+
+            TreeNode node = treeMain.GetNodeAt(e.X, e.Y);
+            if (node == null) { _lastDownNode = null; return; }
+
+            DateTime now = DateTime.Now;
+            System.Drawing.Size dc = SystemInformation.DoubleClickSize;
+            bool sameSpot = Math.Abs(e.X - _lastDownPos.X) <= dc.Width && Math.Abs(e.Y - _lastDownPos.Y) <= dc.Height;
+            bool inTime = (now - _lastDownTime).TotalMilliseconds <= SystemInformation.DoubleClickTime;
+
+            if (node == _lastDownNode && sameSpot && inTime) {
+                _lastDownTime = DateTime.MinValue;   // consuma: evita di interpretare un 3° click come nuovo doppio
+                _lastDownNode = null;
+                if (treeMain.SelectedNode != node) treeMain.SelectedNode = node;
+                await exploreMainNodeAsync(node);
+            }
+            else {
+                _lastDownTime = now;
+                _lastDownNode = node;
+                _lastDownPos = new Point(e.X, e.Y);
+            }
         }
 
         private void treeMain_MouseMove(object sender, MouseEventArgs e) {
@@ -3091,11 +3173,11 @@ namespace viewer {
 		/// Carica e visualizza l'immagine n-esima con la dimensione corrente
 		/// </summary>
 		/// <param name="n"></param>
-		void viewImage(int n) {
+		async Task viewImage(int n) {
             if (n == 0) {
                 return;
             }
-            string fPath = loadImage(n);
+            string fPath = await loadImage(n);
             if (fPath == null) {
                 return;
             }
@@ -3108,25 +3190,25 @@ namespace viewer {
             //pic.Refresh();
         }
 
-        void reContrast() {
+        async Task reContrast() {
             int n = getNum();
-            viewImage(n);
+            await viewImage(n);
 
         }
         private void btnLessContrast_Click(object sender, EventArgs e) {
             if (contrastBar.Value > 10)
                 contrastBar.Value -= 2;
-            reContrast();
+            reContrast().GetAwaiter().GetResult();
         }
 
         private void btnMoreContrast_Click(object sender, EventArgs e) {
             if (contrastBar.Value < 245)
                 contrastBar.Value += 2;
-            reContrast();
+            reContrast().GetAwaiter().GetResult();
         }
 
         private void chkContrast_CheckedChanged(object sender, EventArgs e) {
-            reContrast();
+            reContrast().GetAwaiter().GetResult();
         }
 
         private void contrastBar_ValueChanged(object sender, EventArgs e) {
@@ -3264,7 +3346,7 @@ namespace viewer {
 
 
 
-            var longUrl = getImageUrlByCode(txtCode.Text, currImageWidth);
+            var longUrl = getImageUrlByCode(txtCode.Text);
             //Clipboard.SetText(ShortenUrl(longUrl));
 
             Clipboard.SetText(await ShortenUrl(longUrl));
@@ -3379,12 +3461,12 @@ namespace viewer {
 
         private void btnReset_Click(object sender, EventArgs e) {
             btnReset.Visible = false;
-            viewImage(currentImage);
+            viewImage(currentImage).GetAwaiter().GetResult();
             btnReset.Visible = true;
         }
 
         private void openInBrowserToolStripMenuItem_Click(object sender, EventArgs e) {
-            txtWebAddress.Text = getImageUrlByCode(txtCode.Text, currImageWidth);
+            txtWebAddress.Text = getImageUrlByCode(txtCode.Text);
         }
 
         private void openInBrowserToolStripMenuItem1_Click(object sender, EventArgs e) {
@@ -3615,12 +3697,12 @@ namespace viewer {
             pushHistory(getMark());
 
         }
-        void addImportanteImage() {
+        async Task addImportanteImage() {
             var mark = getMark();
             if (mark == null)
                 return;
             var fileName = mark.rif + ".jpg";
-            string source = loadImage(getNum());
+            string source = await loadImage(getNum());
             if (source == null)
                 return;
             try {
@@ -3665,7 +3747,7 @@ namespace viewer {
             if (curr != null) {
                 if (!important.ContainsKey(curr.rif)) {
                     important.Add(curr.rif, new Squeeze(await ShortenUrl(url), url));
-                    addImportanteImage();
+                    await addImportanteImage();
                     Console.Beep(400, 300);
                 }
                 else {
@@ -3683,7 +3765,7 @@ namespace viewer {
                 if (chkImportante.Checked) {
                     if (!important.ContainsKey(curr.rif)) {
                         important.Add(curr.rif, new Squeeze(await ShortenUrl(url), url));
-                        addImportanteImage();
+                        await addImportanteImage();
                     }
                 }
                 else {
@@ -4558,12 +4640,28 @@ namespace viewer {
         private void fullKey_CheckedChanged(object sender, EventArgs e) {
             longSearch();
         }
-        
-	}
+
+        int dimension = 0;
+        private void txtDimensione_TextChanged(object sender, EventArgs e) {
+            if (String.IsNullOrEmpty(txtDimensione.Text)) {
+                dimension = 0;
+            }
+            else {
+                int dim = toIntOrDefault(txtDimensione.Text,0);
+                if (dim > 0) {
+                    dimension = dim;
+                }
+                else {
+                    dimension = 0;
+                }
+            }
+            deleteCache();
+        }
+    }
 
 
 
-	public class RegistryExtractor {
+    public class RegistryExtractor {
         private static readonly HttpClient client = new HttpClient();
 
         public static async Task ExtractRegistryInfo(string url) {
