@@ -34,7 +34,6 @@ namespace viewer {
             this.saveToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
             this.toolStripMenuItem1 = new System.Windows.Forms.ToolStripMenuItem();
-            this.shortenUrlToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStripMenuItem2 = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStripSeparator2 = new System.Windows.Forms.ToolStripSeparator();
             this.openInBrowserToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -289,7 +288,6 @@ namespace viewer {
             this.saveToolStripMenuItem,
             this.toolStripSeparator1,
             this.toolStripMenuItem1,
-            this.shortenUrlToolStripMenuItem,
             this.toolStripMenuItem2,
             this.toolStripSeparator2,
             this.openInBrowserToolStripMenuItem,
@@ -320,14 +318,7 @@ namespace viewer {
             this.toolStripMenuItem1.Size = new System.Drawing.Size(221, 24);
             this.toolStripMenuItem1.Text = "Shorten Url";
             this.toolStripMenuItem1.Click += new System.EventHandler(this.toolStripMenuItem1_Click);
-            // 
-            // shortenUrlToolStripMenuItem
-            // 
-            this.shortenUrlToolStripMenuItem.Name = "shortenUrlToolStripMenuItem";
-            this.shortenUrlToolStripMenuItem.Size = new System.Drawing.Size(221, 24);
-            this.shortenUrlToolStripMenuItem.Text = "Shorten Image Url";
-            this.shortenUrlToolStripMenuItem.Click += new System.EventHandler(this.shortenUrlToolStripMenuItem_Click);
-            // 
+            //
             // toolStripMenuItem2
             // 
             this.toolStripMenuItem2.Name = "toolStripMenuItem2";
@@ -2275,7 +2266,6 @@ namespace viewer {
         private System.Windows.Forms.CheckBox chkContrast;
         private System.Windows.Forms.TextBox txtBar;
         private System.Windows.Forms.Button btnZoomIn;
-        private System.Windows.Forms.ToolStripMenuItem shortenUrlToolStripMenuItem;
 		private System.Windows.Forms.Label label10;
 		private System.Windows.Forms.TextBox txtGenerali;
         private System.Windows.Forms.ComboBox cmbArchivio;

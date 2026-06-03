@@ -37,6 +37,10 @@ namespace viewer {
     public partial class Viewer : Form {
         static object hashSemaphore = new object();
         HashSet<string> existingRequests = new HashSet<string>();
+        // Conteggio dei fallimenti di download per codice: serve solo a fermare il retry automatico
+        // dopo qualche tentativo (vedi timer1_Tick), NON a blacklistare la pagina in modo permanente.
+        // Un successo azzera il contatore (loadImage), quindi ri-navigando si ritenta sempre.
+        Dictionary<string, int> failCount = new Dictionary<string, int>();
         int BASE_WIDTH = 1200;
 		int BASE_HEIGTH = 1200;
 
@@ -64,9 +68,21 @@ namespace viewer {
                 existingRequests.Add(PathFromCode(code));
             }
         }
-        string getImageUrlByCode(string code) {
+
+        // Incrementa il contatore di fallimenti del codice. Dopo qualche fallimento il timer
+        // smette di ritentare automaticamente (niente martellamento dello stesso URL), ma la
+        // pagina NON viene bloccata: ri-navigando si ritenta e un successo azzera il contatore.
+        void registerFailure(string code) {
+            lock (hashSemaphore) {
+                int n = failCount.ContainsKey(code) ? failCount[code] + 1 : 1;
+                failCount[code] = n;
+                if (n >= 3)
+                    Console.WriteLine($"Codice {code} fallito {n} volte: stop al retry automatico (ri-naviga per ritentare).");
+            }
+        }
+        string getImageUrlByCode(string code, bool useMax = false) {
 			// {scheme}://{server}/iiif/2/{identifier}/{region}/{size}/{rotation}/{quality}.{format}
-            if (dimension == 0) return "https://iiif-antenati.cultura.gov.it/iiif/2/" + code + "/full/max/0/default.jpg";
+            if (useMax || dimension == 0) return "https://iiif-antenati.cultura.gov.it/iiif/2/" + code + "/full/max/0/default.jpg";
             return $"https://iiif-antenati.cultura.gov.it/iiif/2/{code}/full/{dimension},/0/default.jpg";
             // https://iiif-antenati.cultura.gov.it/iiif/2/5VrBEzV/0,2048,1024,518/1024,/0/default.jpg
 
@@ -199,7 +215,27 @@ namespace viewer {
             RegNode.fillTree(treeMain.Nodes);
             readStartValues();
 
+            InitWebView();
             //btnCalcolaCitta_Click(null, null);
+        }
+
+        // Antenati applica hotlink protection sulle immagini IIIF: senza il Referer il
+        // server le rifiuta. Inizializziamo la WebView2 e iniettiamo il Referer (e Sec-Fetch-Site)
+        // nelle richieste verso iiif-antenati, così "open image in browser" (interno) torna a funzionare.
+        private async void InitWebView() {
+            try {
+                await webView.EnsureCoreWebView2Async();
+                webView.CoreWebView2.AddWebResourceRequestedFilter(
+                    "https://iiif-antenati.cultura.gov.it/*",
+                    Microsoft.Web.WebView2.Core.CoreWebView2WebResourceContext.All);
+                webView.CoreWebView2.WebResourceRequested += (s, ev) => {
+                    ev.Request.Headers.SetHeader("Referer", "https://antenati.cultura.gov.it");
+                    ev.Request.Headers.SetHeader("Sec-Fetch-Site", "same-site");
+                };
+            }
+            catch (Exception ex) {
+                Console.WriteLine("InitWebView error: " + ex.Message);
+            }
         }
 
         private int currIndex = 0;
@@ -377,6 +413,7 @@ namespace viewer {
             mapPage.Clear();
             pageDecode.Clear();
             mapWidth.Clear();
+            lock (hashSemaphore) { failCount.Clear(); }
 		}
 
 
@@ -469,7 +506,7 @@ namespace viewer {
 
         private int currPrecaching = 0;
 
-        void precache(int start, int num, bool forward) {
+        async Task precache(int start, int num, bool forward) {
             if (mapPage == null)
                 return;
 
@@ -479,36 +516,34 @@ namespace viewer {
                 isCaching = true;
             }
 
-            int curr = start;
-            int step = forward ? calcStep() : -calcStep();
+            try {
+                int curr = start;
+                int step = forward ? calcStep() : -calcStep();
 
-            for (int i = 0; i < num; i++) {
-                if (stopCaching) {
-                    stopCaching = false;
-                    break;
-                }
-                if (!mapPage.ContainsKey(curr)) {
-                    break;
-                }
-                
-				/*new Task((o_currPrecaching) => {
-                    int currPrecaching = (int)o_currPrecaching;
-                    if (loadImage(mapPage[currPrecaching]) == null) {
-                        stopCaching = true;
+                for (int i = 0; i < num; i++) {
+                    if (stopCaching) {
+                        stopCaching = false;
+                        break;
                     }
-                        
-                },curr).Start();
-                */
-				currPrecaching = curr;
-                if (loadImage(mapPage[curr]) == null)
-                    break;
-                curr += step;
+                    if (!mapPage.ContainsKey(curr)) {
+                        break;
+                    }
 
+                    currPrecaching = curr;
+                    // IMPORTANTE: await. loadImage restituisce Task<string>: senza await il
+                    // confronto "== null" era sempre falso (un Task non e' mai null) e ogni
+                    // iterazione lanciava un download/decode full-res fire-and-forget -> esplosione
+                    // di richieste e memoria. Con await il precache torna sequenziale e limitato.
+                    if (await loadImage(mapPage[curr]) == null)
+                        break;
+                    curr += step;
+                }
             }
-
-            currPrecaching = 0;
-            lock (semaforo) {
-                isCaching = false;
+            finally {
+                currPrecaching = 0;
+                lock (semaforo) {
+                    isCaching = false;
+                }
             }
         }
 
@@ -522,7 +557,10 @@ namespace viewer {
                 int.TryParse(txtCacheSize.Text, out cacheSize);
             }
 
-            new Task(() => { precache(start, cacheSize, forward); }).Start();
+            new Task(async () => {
+                try { await precache(start, cacheSize, forward); }
+                catch (Exception ex) { Console.WriteLine("precache error: " + ex.Message); }
+            }).Start();
         }
 
         private bool isCaching = false;
@@ -558,6 +596,13 @@ namespace viewer {
 		}
 
         static Bitmap LoadBitmapUnlocked(string path) {
+            // Se il file non esiste proprio non entriamo nel loop di retry: tentare di
+            // aprirlo lancerebbe 3 FileNotFoundException "a vuoto" (rumore nel log del
+            // debugger: "Eccezione generata: System.IO.FileNotFoundException"). Il
+            // chiamante gestisce gia' il ritorno null.
+            if (string.IsNullOrEmpty(path) || !File.Exists(path))
+                return null;
+
             for (int i = 0; i < 3; i++) {
                 try {
                     using (var stream = new FileStream(
@@ -569,8 +614,17 @@ namespace viewer {
                         return new Bitmap(img);
                     }
                 }
-                catch {
+                catch (FileNotFoundException) {
+                    // Sparito tra il File.Exists e l'apertura (race): inutile ritentare.
+                    break;
+                }
+                catch (IOException) {
+                    // File temporaneamente bloccato (scrittura concorrente): ritenta.
                     Thread.Sleep(10);
+                }
+                catch {
+                    // Immagine corrotta/non decodificabile: ritentare non aiuta.
+                    break;
                 }
             }
 
@@ -592,8 +646,16 @@ namespace viewer {
             string codePrec = mapPage[num];
             string fPath = PathFromCode(code);
             if (savedFiles.Contains(extendCode(code))) {
-                Console.WriteLine($"File {code} già presente in savedFiles come {extendCode(code)}");
-				return fPath;
+                if (File.Exists(fPath)) {
+                    Console.WriteLine($"File {code} già presente in savedFiles come {extendCode(code)}");
+                    return fPath;
+                }
+                // Voce "fantasma": era in savedFiles ma il file non c'e' piu' su disco
+                // (cache svuotata, cancellato a mano, sessione precedente...). Restituire
+                // un path inesistente faceva poi fallire LoadBitmapUnlocked. Rimuovo la
+                // voce stale e proseguo a ri-scaricare l'immagine.
+                Console.WriteLine($"File {code} in savedFiles ma assente su disco: rimuovo voce stale e riscarico");
+                savedFiles.Remove(extendCode(code));
 			}
             
             try {
@@ -602,6 +664,7 @@ namespace viewer {
                     Console.WriteLine($"Aggiungo in coda richiesta per {code}");
                     if (!await queueDownloadFile(code,  fPath, false)) {
                         removeRequest(code);
+                        registerFailure(code);
                         return null;
                     }
 
@@ -614,9 +677,18 @@ namespace viewer {
 
 					Image img = LoadBitmapUnlocked(fPath);
 
-                    if (img?.Height < 100 || img?.Width < 100) {
+                    if (img == null) {
+                        // File scaricato ma non decodificabile (parziale/corrotto): elimina,
+                        // rimuovi dalla coda e conta come fallimento. Prima qui andava in NRE.
+                        try { if (File.Exists(fPath)) File.Delete(fPath); } catch { }
                         removeRequest(code);
+                        registerFailure(code);
+						return null;
+                    }
+
+                    if (img.Height < 100 || img.Width < 100) {
                         img.Dispose();
+                        removeRequest(code);
 						return null;
                     }
                     if (num > 0) {
@@ -638,6 +710,7 @@ namespace viewer {
                     img.Dispose();
 
                     savedFiles.Add(extendCode(code));
+                    lock (hashSemaphore) { failCount.Remove(code); }
 
                     removeRequest(code);
                 }
@@ -764,7 +837,10 @@ namespace viewer {
                     var old = pic.Image;
                     pic.Image = null;
                     pic.Image = rendered;
-                    old?.Dispose();
+                    // Non liberare mai la bitmap base "canonica" (lastImage): verrebbe usata dopo
+                    // la dispose al prossimo zoom -> immagine rotta / eccezione GDI+.
+                    if (old != null && !ReferenceEquals(old, lastImage) && !ReferenceEquals(old, rendered))
+                        old.Dispose();
                     pic.Invalidate();
                     pic.Update();
                 }
@@ -788,6 +864,14 @@ namespace viewer {
                     imgPanel.VerticalScroll.Value = yScroll;
                 }
                 pic.Refresh();
+
+                // Libera la bitmap base precedente: senza questo ogni cambio pagina perdeva una
+                // bitmap full-res in memoria nativa GDI -> crescita continua -> instabilita'/crash.
+                if (oldImage != null
+                    && !ReferenceEquals(oldImage, lastImage)
+                    && !ReferenceEquals(oldImage, rendered)
+                    && !ReferenceEquals(oldImage, pic.Image))
+                    oldImage.Dispose();
             }
             catch (Exception e) {
                 string err = e.ToString();
@@ -834,6 +918,7 @@ namespace viewer {
             pageDecode = new Dictionary<string, int>();
             mapPage = new Dictionary<int, string>();
             mapWidth = new Dictionary<string, int>();
+            lock (hashSemaphore) { failCount.Clear(); }
 		}
         void setTotPages() {
             txtTotPages.Text = "";
@@ -1091,6 +1176,16 @@ namespace viewer {
                             startPrecache(currentImage + standardStep, true);
                             fPath = await loadImage(mapPage[saved]);
                             if (fPath == null) {
+                                // La pagina non si e' caricata. NON ri-richiederla ad ogni tick dopo
+                                // qualche tentativo: martellare lo stesso URL e' proprio cio' che
+                                // induceva il server a rispondere 403 (auto-DoS) e teneva la UI in
+                                // loop. Dopo alcuni fallimenti fissiamo nEffettivo e ci fermiamo;
+                                // ri-navigando sulla pagina si ritenta da capo. Nessun blacklist
+                                // permanente: la pagina resta richiedibile.
+                                int fails;
+                                lock (hashSemaphore) { failCount.TryGetValue(mapPage[saved], out fails); }
+                                if (fails >= 3)
+                                    nEffettivo = saved;
                                 updating = false;
                                 toMarkImportant = false;
                                 return;
@@ -1224,6 +1319,9 @@ namespace viewer {
                 return true;
             if (!pageDecode.ContainsKey(code))
                 return true;
+            // NB: niente blacklist permanente qui. Un 403 era quasi sempre auto-inflitto dalla
+            // raffica di richieste (vedi precache): bloccare il codice "per sempre" nascondeva
+            // pagine valide. Il loop e' fermato a monte (timer) dopo qualche tentativo.
             if (step == 0) {
                 return false;
             }
@@ -1456,6 +1554,21 @@ namespace viewer {
 
 				var response = PageLoader.getResponseMessage(url, HttpCompletionOption.ResponseContentRead, headers, cookies);
 
+				// Cantaloupe (il server IIIF di Antenati) risponde 403 Forbidden quando la
+				// larghezza richiesta supera quella nativa dell'immagine: l'upscaling e'
+				// vietato (max_scale=1.0). Capita sulle pagine piu' piccole del registro
+				// (tipicamente la copertina/prima pagina, piu' stretta di 3000px). In quel
+				// caso ritentiamo con /full/max/ che restituisce sempre la dimensione nativa
+				// senza ingrandire, quindi non viene mai rifiutato.
+				if (response != null && (int)response.StatusCode == 403 && dimension != 0) {
+					Console.WriteLine($"403 a larghezza {dimension}px: ritento a dimensione nativa (full/max) per {code}");
+					response.Dispose();
+					url = getImageUrlByCode(code, true);
+					currExploring = url;
+					Console.WriteLine($"Richiedo file immagine {url}");
+					response = PageLoader.getResponseMessage(url, HttpCompletionOption.ResponseContentRead, headers, cookies);
+				}
+
 				if (response == null || !response.IsSuccessStatusCode) {
 					Console.WriteLine($"HTTP Error {(int?)response?.StatusCode}: {response?.ReasonPhrase}");
 					return false;
@@ -1463,9 +1576,6 @@ namespace viewer {
                 // Verifica Content-Length se disponibile
                 long? expectedLength = response.Content.Headers.ContentLength;
                 Console.WriteLine($"Expected size: {expectedLength?.ToString() ?? "unknown"}");
-
-                // Leggi tutto in memoria prima
-                byte[] fileBytes = await response.Content.ReadAsByteArrayAsync();
 
                 using (var fs = new FileStream(fileName, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true)) {
                     using (var stream = await response.Content.ReadAsStreamAsync()) {
@@ -2275,8 +2385,11 @@ namespace viewer {
                         TreeNode foundCitta = searchByRegistro(idRegistro, treeViewCitta.Nodes);
                         if (foundCitta != null) {
                             foundCitta.EnsureVisible();
-                            if (treeViewCitta.SelectedNode != foundCitta)
-                                treeViewCitta.SelectedNode = foundCitta;
+                            if (!_treeSelecting && treeViewCitta.SelectedNode != foundCitta) {
+                                _treeSelecting = true;
+                                try { treeViewCitta.SelectedNode = foundCitta; }
+                                finally { _treeSelecting = false; }
+                            }
                         }
                     }
 
@@ -2310,6 +2423,10 @@ namespace viewer {
 
 
         private bool _exploring = false;
+
+        // Anti-rientro per la sincronizzazione treeMain <-> treeViewCitta: senza questo, selezionare
+        // un nodo in un albero riseleziona l'altro, che riseleziona il primo... -> StackOverflow.
+        private bool _treeSelecting = false;
 
         // Aggiornamento dell'albero: gira sul thread della UI.
         void applyChildren(TreeNode nn, RegNode regN, List<IArchiveNode> nodes) {
@@ -2741,8 +2858,10 @@ namespace viewer {
                     TreeNode foundMain = searchByRegistro(reg.idRegistro, treeMain.Nodes);
                     if (foundMain != null) {
                         foundMain.EnsureVisible();
-                        if (treeMain.SelectedNode != foundMain) {
-                            treeMain.SelectedNode = foundMain;
+                        if (!_treeSelecting && treeMain.SelectedNode != foundMain) {
+                            _treeSelecting = true;
+                            try { treeMain.SelectedNode = foundMain; }
+                            finally { _treeSelecting = false; }
                         }
 
                     }
@@ -3332,25 +3451,6 @@ namespace viewer {
                 updateVisited();
             }
 
-        }
-
-        private async void shortenUrlToolStripMenuItem_Click(object sender, EventArgs e) {
-            //8068db688a4614632c0a6050c033bc82a2c75b67
-            if (txtPageNum.Text.Trim() == "" || txtPageNum.Text == "0")
-                return;
-            //var longUrl = "http://dl.antenati.san.beniculturali.it/gallery2/main.php?g2_view=core.DownloadItem&g2_itemId=" +txtPageNum.Text;
-
-            RegNode rn = treeMain.SelectedNode?.Tag as RegNode;
-
-            //string longUrl = rn.archiveNode.href + "/" + txtCode.Text;
-
-
-
-            var longUrl = getImageUrlByCode(txtCode.Text);
-            //Clipboard.SetText(ShortenUrl(longUrl));
-
-            Clipboard.SetText(await ShortenUrl(longUrl));
-            pushVisited();
         }
 
         private void contextMenuStrip1_Opening(object sender, CancelEventArgs e) {
