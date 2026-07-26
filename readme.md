@@ -65,6 +65,6 @@ Le contribuzioni sono benvenute! Se desideri contribuire a questo progetto:
 
 ## Contatti
 
-Gaetano Lazzo - [Inserire informazioni di contatto]
+Gaetano Lazzo - [@gaelazzo](https://github.com/gaelazzo) — per segnalazioni e richieste usa le [Issues](https://github.com/gaelazzo/antenati/issues)
 
 Link al progetto: [https://github.com/gaelazzo/antenati](https://github.com/gaelazzo/antenati)
