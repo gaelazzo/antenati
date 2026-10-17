@@ -243,6 +243,37 @@ namespace viewer.Tests {
             Assert.That(t.GetField("title").GetValue(shortRif), Is.EqualTo("Bari/1813"));
         }
 
+        // ---------- registro corrente ----------
+
+        void PrepareSetRegister() {
+            Priv.Set(v, "txtCodiceRegistro", new TextBox());
+            Priv.Set(v, "txtTotPages", new TextBox { Text = "120" });
+            Priv.Set(v, "failCount", new Dictionary<string, int> { ["x"] = 3 });
+            Priv.Set(v, "idRegistro", "282248");
+            Priv.Set(v, "mapPage", new Dictionary<int, string> { [1] = "a" });
+        }
+
+        [Test]
+        public void SetRegister_CodiceSconosciuto_VistaVuotaSenzaErrore() {
+            PrepareSetRegister();
+
+            Assert.That(() => Priv.Call(v, "setRegister", "999999999"), Throws.Nothing);
+            Assert.That(Priv.Get(v, "idRegistro"), Is.Null);
+            Assert.That((Dictionary<int, string>)Priv.Get(v, "mapPage"), Is.Empty);
+            Assert.That(((TextBox)Priv.Get(v, "txtTotPages")).Text, Is.EqualTo("0"));
+            Assert.That((Dictionary<string, int>)Priv.Get(v, "failCount"), Is.Empty);
+        }
+
+        [TestCase(null)]
+        [TestCase("")]
+        public void SetRegister_Vuoto_VistaVuota(string id) {
+            PrepareSetRegister();
+            Priv.Set(v, "mapWidth", new Dictionary<string, int>());
+            Priv.Call(v, "setRegister", id);
+            Assert.That(Priv.Get(v, "idRegistro"), Is.Null);
+            Assert.That((Dictionary<int, string>)Priv.Get(v, "mapPage"), Is.Empty);
+        }
+
         [Test]
         public void ToIntOrDefault() {
             Assert.That(v.toIntOrDefault("12"), Is.EqualTo(12));

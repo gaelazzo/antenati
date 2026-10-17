@@ -946,15 +946,15 @@ namespace viewer {
             idRegistro = idRegister;
 
 
-            Registro r = Registro.registroById[idRegister];
-            if (r.nPaginaIndice != 0 && r.idRegistroIndice == null) {
-                r.idRegistroIndice = r.idRegistro;
-            }
-
-            if (r == null) {
+            // Codice sconosciuto (indirizzo incollato, start.txt di un'altra sessione...): vista vuota.
+            // Prima l'indicizzatore lanciava KeyNotFound e il controllo su null arrivava dopo l'uso.
+            if (!Registro.registroById.TryGetValue(idRegister, out Registro r)) {
                 clearRegister();
                 setTotPages();
                 return;
+            }
+            if (r.nPaginaIndice != 0 && r.idRegistroIndice == null) {
+                r.idRegistroIndice = r.idRegistro;
             }
 
             currManifest = r.manifest;
@@ -3612,6 +3612,12 @@ namespace viewer {
                 string codice = match.Groups[1].Value;
                 var idRegistro = codice;
                 if (idRegistro != null) {
+                    // come in decodeUrl: registro non ancora nell'albero
+                    if (!Registro.registroById.ContainsKey(idRegistro)) {
+                        MessageBox.Show("Manca il registro " + idRegistro + ", lo copio nel codice registro.");
+                        txtCodiceRegistro.Text = idRegistro;
+                        return;
+                    }
                     setRegister(idRegistro);
                     var nn = RegNode.addArchiveNodeToTree(Registro.registroById[idRegistro], treeMain.Nodes);
                     if (nn != null) {
