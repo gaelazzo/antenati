@@ -182,11 +182,11 @@ namespace viewer {
             }
             catch {
             }
-			PageLoader.getResponseMessage("https://antenati.cultura.gov.it/");
-            PageLoader.getResponseMessage("https://analytics-icar.cultura.gov.it/matomo.js");
-			PageLoader.getResponseMessage("https://www.googletagmanager.com/gtag/js?id=G-HPLTCJ58MW");
-			PageLoader.getResponseMessage("https://antenati.cultura.gov.it/ark:/12657/an_ua244110/LPbBpOd/");
-			
+			// Cookie di sessione Antenati (PHPSESSID) in background: prima qui c'erano 4 GET sincrone
+			// (home, ark, matomo.js, gtag.js) che bloccavano l'apertura della finestra per secondi.
+			// matomo e gtag non impostano cookie per Antenati, l'ark ripeteva la home: bastava la home.
+			PageLoader.StartWarmUp();
+
 
 
 			statusLabel = new ToolStripStatusLabel("Pronto");
@@ -461,7 +461,7 @@ namespace viewer {
 
 
         async Task<string> setPageByCode(string code) {
-            if (pageDecode.ContainsKey(pageCode)) {
+            if (pageDecode.ContainsKey(code)) {
                 pageCode = code;
                 pageNumber = pageDecode[pageCode];
                 return await loadJpg(pageCode);
@@ -480,8 +480,8 @@ namespace viewer {
         }
 
         async Task<string> loadJpg(string code) {
-			var imgUrl = getImageUrlByCode(code);
-			return await loadImage(imgUrl);
+			// loadImage vuole il codice immagine, non l'URL: l'URL lo costruisce queueDownloadFile.
+			return await loadImage(code);
 
         }
 
@@ -1158,14 +1158,17 @@ namespace viewer {
                 setNum(requestedImage);
             }
 
+            // currentImage = "token" della pagina piu' recente richiesta. DEVE essere aggiornato ad
+            // OGNI tick, non solo quando parte un nuovo task. Altrimenti, con due click rapidi su
+            // avanti, il load gia' in volo per la pagina vecchia (N+1) non viene mai invalidato:
+            // resta saved == currentImage e committa la sua immagine come se fosse quella corrente,
+            // mentre il numero pagina dice gia' N+2. Rinfrescandolo qui, il task in volo diventa
+            // stale (saved != currentImage) e non committa nulla; al tick dopo si carica N+2.
+            if (requestedImage != 0)
+                currentImage = requestedImage;
+
             if (requestedImage != nEffettivo && updating == false && requestedImage != 0) {
                 updating = true;
-                currentImage = requestedImage; //nuova immagine richiesta
-                string code = null;
-                if (mapPage.ContainsKey(requestedImage)) {
-                    code = mapPage[requestedImage];
-                    //txtWebAddress.Text = getImageUrlByCode(code);
-                }
 
                 //tabControl1.SelectedTab = tabPage1;
                 new Task(async () => {
@@ -1173,7 +1176,7 @@ namespace viewer {
                     try {
                         if (mapPage.ContainsKey(requestedImage)) {
                             int saved = requestedImage;
-                            startPrecache(currentImage + standardStep, true);
+                            startPrecache(saved + standardStep, true);
                             fPath = await loadImage(mapPage[saved]);
                             if (fPath == null) {
                                 // La pagina non si e' caricata. NON ri-richiederla ad ogni tick dopo
@@ -1184,7 +1187,7 @@ namespace viewer {
                                 // permanente: la pagina resta richiedibile.
                                 int fails;
                                 lock (hashSemaphore) { failCount.TryGetValue(mapPage[saved], out fails); }
-                                if (fails >= 3)
+                                if (fails >= 3 && saved == currentImage)
                                     nEffettivo = saved;
                                 updating = false;
                                 toMarkImportant = false;
@@ -1193,12 +1196,20 @@ namespace viewer {
 
                             try {
                                 if (saved == currentImage) {
-                                    imageToDisplay = LoadBitmapUnlocked(fPath);
-                                    nEffettivo = saved;
+                                    // Stage immagine + numero pagina. NB: NON impostare qui nEffettivo.
+                                    // "Pagina mostrata" va segnata solo DOPO che displayImage l'ha
+                                    // davvero disegnata (vedi sotto): segnarla al load farebbe credere
+                                    // visualizzata una pagina che potrebbe non arrivare mai a video, e
+                                    // il loop si fermerebbe (numero non piu' rosso) sulla pagina sbagliata.
+                                    var bmp = LoadBitmapUnlocked(fPath);
+                                    if (bmp != null) {
+                                        imageToDisplayNum = saved;   // scritto PRIMA
+                                        imageToDisplay = bmp;        // pubblicato per ULTIMO
+                                    }
                                 }
                             }
                             //catch (FileNotFoundException f) {
-                            //    //savedFiles.Remove(fPath);                               
+                            //    //savedFiles.Remove(fPath);
                             //}
                             catch {
                             }
@@ -1214,13 +1225,20 @@ namespace viewer {
                 }).Start();
             }
 
-            if (imageToDisplay != null) {
-                displayImage(imageToDisplay);
+            // Consuma l'immagine in attesa SOLO se possiamo davvero disegnarla, e segna nEffettivo
+            // (= pagina realmente a video, e quindi quando il numero smette di essere rosso) SOLO
+            // dopo il disegno effettivo. Se displayImage venisse saltato (drawing in corso) la lascio
+            // in coda per il tick successivo invece di perderla disallineando nEffettivo dal video.
+            var pending = imageToDisplay;
+            if (pending != null && !drawing) {
+                int pendingNum = imageToDisplayNum;
+                imageToDisplay = null;
+                displayImage(pending);
+                nEffettivo = pendingNum;
                 if (toPushHistory) {
                     toPushHistory = false;
                     pushHistory(getMark());
                 }
-                imageToDisplay = null;
             }
             // Gestisce i bottoni +1 e -1 
             manageBtnPiuUnoMenoUno(requestedImage);
@@ -1337,7 +1355,12 @@ namespace viewer {
         private int nEffettivo = 0;
 
 
-        private Image imageToDisplay = null;
+        // imageToDisplay e imageToDisplayNum sono scritti da un thread di background (il Task di
+        // load) e letti dal timer (UI thread): volatile per pubblicarli in modo coerente. La coppia
+        // va scritta num-PRIMA / image-DOPO e letta image-PRIMA / num-DOPO, cosi' se l'immagine e'
+        // non-null il numero abbinato e' gia' valido.
+        private volatile Image imageToDisplay = null;
+        private volatile int imageToDisplayNum = 0;
 
 
         void pushHistory(RifPage rif) {
@@ -3300,11 +3323,12 @@ namespace viewer {
             if (fPath == null) {
                 return;
             }
-            imageToDisplay = LoadBitmapUnlocked(fPath);
-
-            if (imageToDisplay == null) return;
+            var bmp = LoadBitmapUnlocked(fPath);
+            if (bmp == null) return;
             if (chkContrast.Checked)
-                processImage((Bitmap)imageToDisplay, contrastBar.Value);
+                processImage(bmp, contrastBar.Value);
+            imageToDisplayNum = n;   // scritto PRIMA
+            imageToDisplay = bmp;    // pubblicato per ULTIMO
             //displayImage(imageToDisplay);
             //pic.Refresh();
         }

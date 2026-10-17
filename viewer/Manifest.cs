@@ -203,6 +203,7 @@ namespace viewer {
             //https://dam-antenati.cultura.gov.it/antenati/containers/wrrkrG8/manifest
             
             try {
+                PageLoader.WaitWarmUp();
                 Dictionary <string,string>cookies = new Dictionary<string,string>();
                 cookies.Add("PHPSESSID", PageLoader.getCookie("PHPSESSID"));
                 cookies.Add("path", "/");
@@ -270,6 +271,7 @@ namespace viewer {
 			//https://dam-antenati.cultura.gov.it/antenati/containers/wrrkrG8/manifest
 
 			try {
+				PageLoader.WaitWarmUp();
 				Dictionary<string, string> cookies = new Dictionary<string, string>();
 				cookies.Add("PHPSESSID", PageLoader.getCookie("PHPSESSID"));
 				cookies.Add("path", "/");

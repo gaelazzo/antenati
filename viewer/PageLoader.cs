@@ -98,6 +98,23 @@ namespace viewer {
             //w.Encoding = Encoding.UTF8;
             //var html = w.DownloadString(url);
         }
+        static Task warmUpTask;
+
+        /// <summary>
+        /// Visita la home di Antenati in background per ottenere PHPSESSID e i cookie del bilanciatore
+        /// </summary>
+        public static void StartWarmUp() {
+            warmUpTask = Task.Run(() => getResponseMessage("https://antenati.cultura.gov.it/")?.Dispose());
+        }
+
+        /// <summary>
+        /// Attende la fine del warm-up: va chiamato da chi ha bisogno di PHPSESSID
+        /// </summary>
+        public static void WaitWarmUp() {
+            try { warmUpTask?.Wait(); }
+            catch { /* senza cookie la richiesta parte lo stesso, come prima in caso di errore */ }
+        }
+
         public static string getPage(string url) {
             var responseBytes = getResponseMessage(url).Content.ReadAsByteArrayAsync().Result;
             return Encoding.UTF8.GetString(responseBytes);
