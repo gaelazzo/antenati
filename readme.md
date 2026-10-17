@@ -207,6 +207,29 @@ interruzione.
 └── README.md              # Questo file
 ```
 
+## Test
+
+I test (NUnit) sono in `viewer.Tests/`. Il progetto `viewer` è .NET Framework
+"vecchio stile", quindi si compila con l'MSBuild di Visual Studio e si esegue
+con `dotnet test`:
+
+```powershell
+msbuild viewer.Tests\viewer.Tests.csproj -restore -p:Configuration=Debug
+dotnet test viewer.Tests\viewer.Tests.csproj --no-build
+```
+
+I test normali non vanno in rete: lavorano in una cartella temporanea, usano
+pagine di Antenati salvate in `viewer.Tests/Fixtures/` e un server HTTP locale
+al posto di iiif/dam. I test che interrogano il sito vero sono esclusi di
+default; servono a capire se Antenati ha cambiato le pagine:
+
+```powershell
+dotnet test viewer.Tests\viewer.Tests.csproj --no-build --filter TestCategory=Online
+```
+
+Con la variabile d'ambiente `REFRESH_FIXTURES=1` riscrivono anche le pagine in
+`Fixtures/`.
+
 ## Contribuire
 
 Le contribuzioni sono benvenute! Se desideri contribuire a questo progetto:
