@@ -92,10 +92,15 @@ Regex regex = new Regex(pattern);
 
         public static List<IArchiveNode> read(string idFondo) {
             Fondo f = Fondo.fondoById[idFondo];
-            List<IArchiveNode> res = new List<IArchiveNode>();
-
-            
             var htmlContent = PageLoader.getPage(getIndexUrl(f.idArchivio));
+            return parseSerie(idFondo, htmlContent);
+        }
+
+        /// <summary>
+        /// Estrae le serie del fondo dalla pagina dell'archivio e le aggiunge a series/serieById
+        /// </summary>
+        public static List<IArchiveNode> parseSerie(string idFondo, string htmlContent) {
+            List<IArchiveNode> res = new List<IArchiveNode>();
             // Trova il nome dei fondi
             /*  <ul class="flex-list">
              * <!--{"q":"+model_s:\"fondo\" +livello_superiore_i:idFondo","rows":"9999","wt":"json"}-->

@@ -135,8 +135,7 @@ namespace viewer {
 
             public static List<IArchiveNode> read(string anno, string idSerie, string kind) {
             AnnoSerieKind annoSerieKind = AnnoSerieKind.annoSerieKindById[AnnoSerieKind.objectKey(idSerie,anno,kind)];
-            List<IArchiveNode> res = new List<IArchiveNode>();
-            
+
             string url = getIndexUrl(annoSerieKind.idSerie, annoSerieKind.anno, annoSerieKind.kind);            
             // Trova l'elenco dei tipi della serie/anno
             /*  <a href="https://antenati.cultura.gov.it/search-registry/?serie=262843&amp;descrizione=Modugno&amp;s_facet_query=anni_is%3A1826&amp;lang=it" title="" data-facet-term="tipologia_ss:&quot;Nati, indice&quot;">
@@ -174,6 +173,14 @@ namespace viewer {
                 }
                 htmlContent = response.Content.ReadAsStringAsync().Result;
             }
+            return parseRegistri(anno, idSerie, kind, htmlContent);
+        }
+
+        /// <summary>
+        /// Estrae i registri dalla pagina di ricerca serie/anno/tipologia e li aggiunge a registri/registroById
+        /// </summary>
+        public static List<IArchiveNode> parseRegistri(string anno, string idSerie, string kind, string htmlContent) {
+            List<IArchiveNode> res = new List<IArchiveNode>();
             /*
              * 
              * <li class="search-item" data-id="274175">
@@ -219,7 +226,6 @@ namespace viewer {
 
 
 
-            var currKind = annoSerieKind.kind;
             //string pattern = @"<li class=""search-item"" data-id=""(\d+)"".*?>.*?Segnatura attuale:</strong>\s*(.*?)\s*</p>";
             var matches = Regex.Matches(htmlContent, pattern, RegexOptions.Singleline);
 

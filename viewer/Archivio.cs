@@ -71,6 +71,13 @@ namespace viewer {
             //w.Encoding = Encoding.UTF8;
             //var htmlContent = w.DownloadString(ArchivioIndexUrl);
             var htmlContent = PageLoader.getPage(ArchivioIndexUrl);
+            parseArchivi(htmlContent);
+        }
+
+        /// <summary>
+        /// Estrae gli archivi dalla pagina "esplora gli archivi" e li aggiunge a archivi/archivioById
+        /// </summary>
+        public static void parseArchivi(string htmlContent) {
             // Trova il nome dell'archivio (decodificato)
             /*
              * .setContent("<div>                          <h3>Archivio di Stato di Grosseto</h3>                          

@@ -68,12 +68,19 @@ namespace viewer {
         }
         
         public static List<IArchiveNode> read(string idArchivio) {
-            List<IArchiveNode> res = new List<IArchiveNode>();
             //var w = new WebClient();
             //w.Encoding = Encoding.UTF8;
             string url = getIndexUrl(idArchivio);
             //var htmlContent = w.DownloadString(url);
             var htmlContent = PageLoader.getPage(url);
+            return parseFondi(idArchivio, htmlContent);
+        }
+
+        /// <summary>
+        /// Estrae i fondi dalla pagina dell'archivio e li aggiunge a fondi/fondoById
+        /// </summary>
+        public static List<IArchiveNode> parseFondi(string idArchivio, string htmlContent) {
+            List<IArchiveNode> res = new List<IArchiveNode>();
 
             // Trova il nome dei fondi
             /* <div id="archive_property_select" hidden>

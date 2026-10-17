@@ -152,7 +152,6 @@ namespace viewer {
         }
         public static List<IArchiveNode> read(string idSerie) {
             Serie serie = Serie.serieById[idSerie];
-            List<IArchiveNode> res = new List<IArchiveNode>();
             string url = getIndexUrl(serie.idSerie);
             var response = PageLoader.getResponseMessage(url,HttpCompletionOption.ResponseHeadersRead);
             if (response.RequestMessage.RequestUri.AbsoluteUri != url) {
@@ -165,8 +164,15 @@ namespace viewer {
 
             }
             // Contenuto della pagina finale
-            var htmlContent =  response.Content.ReadAsStringAsync().Result;                
-            
+            var htmlContent =  response.Content.ReadAsStringAsync().Result;
+            return parseAnni(idSerie, htmlContent);
+        }
+
+        /// <summary>
+        /// Estrae gli anni della serie dalla pagina di ricerca e li aggiunge a annoSeries/annoSerieById
+        /// </summary>
+        public static List<IArchiveNode> parseAnni(string idSerie, string htmlContent) {
+            List<IArchiveNode> res = new List<IArchiveNode>();
 
             // Trova l'elenco degli anni della serie
             /*  <ul class="flex-list">

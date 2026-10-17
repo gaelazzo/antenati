@@ -80,10 +80,13 @@ namespace viewer {
                     Console.WriteLine($"Codice {code} fallito {n} volte: stop al retry automatico (ri-naviga per ritentare).");
             }
         }
+        // Base del server IIIF delle immagini (modificabile solo dai test, per puntare a un server locale)
+        public static string iiifBaseUrl = "https://iiif-antenati.cultura.gov.it/iiif/2/";
+
         string getImageUrlByCode(string code, bool useMax = false) {
 			// {scheme}://{server}/iiif/2/{identifier}/{region}/{size}/{rotation}/{quality}.{format}
-            if (useMax || dimension == 0) return "https://iiif-antenati.cultura.gov.it/iiif/2/" + code + "/full/max/0/default.jpg";
-            return $"https://iiif-antenati.cultura.gov.it/iiif/2/{code}/full/{dimension},/0/default.jpg";
+            if (useMax || dimension == 0) return iiifBaseUrl + code + "/full/max/0/default.jpg";
+            return $"{iiifBaseUrl}{code}/full/{dimension},/0/default.jpg";
             // https://iiif-antenati.cultura.gov.it/iiif/2/5VrBEzV/0,2048,1024,518/1024,/0/default.jpg
 
             //return $"https://iiif-antenati.cultura.gov.it/iiif/2/{code}/full/{width},/0/default.jpg";

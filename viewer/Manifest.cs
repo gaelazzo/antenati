@@ -31,18 +31,25 @@ namespace viewer {
 		public Dictionary<string, int> pageWidth {get; set;}
 
 		/// <summary>
+		/// Livelli del contesto archivistico, separati da ">" (spazi attorno non obbligatori)
+		/// </summary>
+		private static string[] ContestoParts(string contesto) {
+            if (string.IsNullOrWhiteSpace(contesto))
+                return new string[0];
+            return contesto.Split('>').Select(p => p.Trim()).Where(p => p != "").ToArray();
+        }
+
+		/// <summary>
 		/// Dalla stringa del contesto archivistico estrae il nome del comune
 		/// </summary>
 		/// <param name="contesto">es.  //"Archivio di Stato di Bari > Stato civile italiano > Carbonara"</param>
-		/// <returns>in questo caso Carbonara</returns>
+		/// <returns>in questo caso Carbonara; null se il contesto si ferma al fondo</returns>
 		private static string GetComuneFromContestoArchivistico(string contesto) {
             // "value": "Archivio di Stato di Napoli > Stato civile della restaurazione (quartieri di Napoli) > Arenella"
-            // Estrapola il comune, che dovrebbe essere l'ultimo elemento separato da " > ", in questo caso Arenella
-            if (contesto != null) {
-                var parts = contesto.Split(new string[] { " > " }, StringSplitOptions.None);
-                return parts.Length > 0 ? parts[2] : null;
-            }
-            return null;
+            // Il comune e' l'ultimo elemento, in questo caso Arenella, ma solo se sotto il fondo c'e' un livello:
+            // con "Archivio > Fondo" l'ultimo elemento sarebbe il fondo.
+            var parts = ContestoParts(contesto);
+            return parts.Length >= 3 ? parts[parts.Length - 1] : null;
         }
 
         /// <summary>
@@ -52,15 +59,14 @@ namespace viewer {
         /// <returns>in questo caso Stato civile italiano</returns>
         private static string GetRegistroFromContestoArchivistico(string contesto) {
             // "value": "Archivio di Stato di Napoli > Stato civile della restaurazione (quartieri di Napoli) > Arenella"
-            // Estrapola il comune, che dovrebbe essere l'ultimo elemento separato da " > "
-            if (contesto != null) {
-                var parts = contesto.Split(new string[] { " > " }, StringSplitOptions.None);
-                return parts.Length > 0 ? parts[1] : null;
-            }
-            return null;
+            // Il fondo e' sempre il secondo livello
+            var parts = ContestoParts(contesto);
+            return parts.Length >= 2 ? parts[1] : null;
         }
 
         private static string GetMetadataValue(JArray metadata, string label) {
+            if (metadata == null)
+                return null;
             foreach (var item in metadata) {
                 if (item["label"]?.ToString() == label) {
                     return item["value"]?.ToString();
@@ -105,7 +111,20 @@ namespace viewer {
             JObject manifestJson = await ManifestLoader.LoadManifestJsonAsync(manifestId);
             if (manifestJson == null) {
                 return null;
-            }                
+            }
+            Manifest m = fromJson(manifestJson);
+
+            //await m.GetAllImageSizesAsync(imageIds);
+			string jsonData = JsonConvert.SerializeObject(m, Formatting.Indented);
+            SafeFile.WriteAllText(filename, jsonData);
+            allManifest[manifestId] = m;
+            return m;
+        }
+
+        /// <summary>
+        /// Costruisce il Manifest (mappa pagine, larghezze, metadati) dal JSON IIIF scaricato
+        /// </summary>
+        public static Manifest fromJson(JObject manifestJson) {
             Dictionary<int, string> mapPage = new Dictionary<int, string>();
             Dictionary<string, int> pageDecode = new Dictionary<string, int>();
             Dictionary<string, int> pageWidth= new Dictionary<string, int>();
@@ -157,12 +176,7 @@ namespace viewer {
             m.tipologia = GetMetadataValue(metadata, "Tipologia");
             m.mapPage = mapPage;
             m.pageWidth = pageWidth;
-
-            //await m.GetAllImageSizesAsync(imageIds);
-			string jsonData = JsonConvert.SerializeObject(m, Formatting.Indented);
-            SafeFile.WriteAllText(filename, jsonData);
             m.pageDecode = pageDecode;
-            allManifest[manifestId] = m;
             return m;
         }
     }
@@ -176,8 +190,10 @@ namespace viewer {
         /// <returns></returns>
         public static string ExtractManifestId(string url) {
             var html = PageLoader.getPage(url);
-            
+            return ExtractManifestIdFromHtml(html);
+        }
 
+        public static string ExtractManifestIdFromHtml(string html) {
             // Cerca il tag <script> contenente windowsId
             // Usa una regex per estrarre il valore di windowsId
             var match = Regex.Match(html, @"let windowsId\s*=\s*'([^']+)'");
@@ -193,11 +209,13 @@ namespace viewer {
 
     public class ManifestLoader {
         private static readonly HttpClient client = new HttpClient();
-        
+
+        // Base del server dei manifest (modificabile solo dai test, per puntare a un server locale)
+        public static string damBaseUrl = "https://dam-antenati.cultura.gov.it/antenati/containers/";
 
         public static async Task<JObject> LoadManifestJsonAsync(string manifestId) {
             // Costruisce l'URL del manifest del registro
-            string url = $"https://dam-antenati.cultura.gov.it/antenati/containers/{manifestId}/manifest";
+            string url = $"{damBaseUrl}{manifestId}/manifest";
 
 
             //https://dam-antenati.cultura.gov.it/antenati/containers/wrrkrG8/manifest

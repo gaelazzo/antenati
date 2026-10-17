@@ -121,7 +121,8 @@ namespace viewer {
                 res.Add(a);
                 annoSerieKindById[a.idSerieAnnoKind] = a;
 
-                var child = Registro.deriveRegistroFromPage(anno, idSerie, tipo, html);
+                // Il codice an_uaXXXX sta nell'url del redirect, non nell'html della pagina
+                var child = Registro.deriveRegistroFromPage(anno, idSerie, tipo, url);
                 if (child != null) {
                     foreach (var c in child)
                         res.Add(c);
@@ -132,7 +133,6 @@ namespace viewer {
         }
 
         public static List<IArchiveNode> read(string idAnnoSerie) {
-            List<IArchiveNode> res = new List<IArchiveNode>();
             AnnoSerie annoSerie= AnnoSerie.annoSerieById[idAnnoSerie];
 
             
@@ -150,6 +150,15 @@ namespace viewer {
 
             // Contenuto della pagina finale
             string htmlContent = response.Content.ReadAsStringAsync().Result;
+            return parseKinds(idAnnoSerie, htmlContent);
+        }
+
+        /// <summary>
+        /// Estrae le tipologie (Nati, Morti, ...) dalla pagina di ricerca serie/anno e le aggiunge a annoSeriesKind/annoSerieKindById
+        /// </summary>
+        public static List<IArchiveNode> parseKinds(string idAnnoSerie, string htmlContent) {
+            List<IArchiveNode> res = new List<IArchiveNode>();
+            AnnoSerie annoSerie = AnnoSerie.annoSerieById[idAnnoSerie];
 
             // Trova l'elenco dei tipi della serie/anno
             /*  <a href="https://antenati.cultura.gov.it/search-registry/?serie=262843&amp;descrizione=Modugno&amp;s_facet_query=anni_is%3A1826&amp;lang=it" title="" data-facet-term="tipologia_ss:&quot;Nati, indice&quot;">
