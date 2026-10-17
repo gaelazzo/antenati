@@ -645,8 +645,6 @@ namespace viewer {
                 return null;
             if (!pageDecode.ContainsKey(code))
                 return null;
-            int num = pageDecode[code];
-            string codePrec = mapPage[num];
             string fPath = PathFromCode(code);
             if (savedFiles.Contains(extendCode(code))) {
                 if (File.Exists(fPath)) {
@@ -690,24 +688,14 @@ namespace viewer {
                     }
 
                     if (img.Height < 100 || img.Width < 100) {
+                        // Segnaposto servito dal sito al posto dell'immagine: va cancellato, altrimenti
+                        // al giro dopo checkFileRequestExists lo trova su disco e resta in cache
                         img.Dispose();
+                        try { if (File.Exists(fPath)) File.Delete(fPath); } catch { }
                         removeRequest(code);
+                        registerFailure(code);
 						return null;
                     }
-                    if (num > 0) {
-                        string fNamePrec = codePrec + ".jpg";
-                        string fPathPrec = PathFromCode(codePrec);
-                        if (File.Exists(fPathPrec)) {
-                            var fPrec = new FileInfo(fPathPrec);
-                            if (fPrec.Length < f.Length) {
-                                if (savedFiles.Contains(extendCode(codePrec)))
-                                    savedFiles.Remove(extendCode(codePrec));
-                                File.Delete(fPathPrec);
-                            }
-                        }
-                    }
-
-
                     esistenti.Add(PathFromCode(code));
 
                     img.Dispose();

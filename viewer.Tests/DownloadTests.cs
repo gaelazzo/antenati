@@ -250,6 +250,34 @@ namespace viewer.Tests {
             Assert.That(((Dictionary<string, int>)Priv.Get(v, "failCount")).ContainsKey(code), Is.False);
         }
 
+        static byte[] PlaceholderBmp() {
+            // 90x90: sotto i 100 pixel ma oltre i 10.000 byte, cosi' supera il primo filtro sulla dimensione
+            using (var b = new Bitmap(90, 90))
+            using (var ms = new MemoryStream()) {
+                b.Save(ms, ImageFormat.Bmp);
+                return ms.ToArray();
+            }
+        }
+
+        [Test]
+        public void LoadImage_Segnaposto_NonRestaInCache() {
+            string code = NewCode();
+            PrepareRegister(code);
+            byte[] placeholder = PlaceholderBmp();
+            Assert.That(placeholder.Length, Is.GreaterThan(10000));
+            server.Handler = _ => Image(placeholder);
+
+            Assert.That(LoadImage(code), Is.Null);
+            Assert.That(File.Exists(Path.Combine("data", Priv.Call<string>(v, "extendCode", code + ".jpg"))), Is.False);
+            Assert.That(((Dictionary<string, int>)Priv.Get(v, "failCount"))[code], Is.EqualTo(1));
+
+            // al tentativo successivo il sito manda l'immagine vera: deve arrivare quella
+            server.Handler = _ => Image(Jpeg);
+            string path = LoadImage(code);
+            Assert.That(path, Is.Not.Null);
+            Assert.That(File.ReadAllBytes(path), Is.EqualTo(Jpeg));
+        }
+
         [Test]
         public void LoadImage_CodiceFuoriDalManifest_Null() {
             PrepareRegister("aaa");
