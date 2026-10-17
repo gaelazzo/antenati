@@ -3827,6 +3827,7 @@ namespace viewer {
             if (source == null)
                 return;
             try {
+                Directory.CreateDirectory("important"); // su un'installazione nuova non c'e' ancora
                 System.IO.File.Copy(source, Path.Combine("important", fileName), true);
             }
             catch (Exception e) {
