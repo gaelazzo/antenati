@@ -74,6 +74,10 @@ namespace viewer {
                     annoSerieById[s.key] = s;
                     clean.Add(s);
                 }
+                else {
+                    // il costruttore l'aveva gia' aggiunta alla serie
+                    Serie.serieById[s.idSerie].myAnnoSeries.Remove(s);
+                }
             }
             annoSeries= clean;
 
@@ -123,11 +127,10 @@ namespace viewer {
                 
                 string anno = yearMatch.Groups[1].Value;
 
-                AnnoSerie AS = new AnnoSerie( idSerie, anno);
-                if (annoSerieById.ContainsKey(AS.key)) {
-                    AS = annoSerieById[AS.key];
-                }
-                else {
+                // Controllo prima di costruire: il costruttore aggiunge l'istanza a Serie.myAnnoSeries
+                AnnoSerie AS;
+                if (!annoSerieById.TryGetValue(objectKey(idSerie, anno), out AS)) {
+                    AS = new AnnoSerie(idSerie, anno);
                     annoSeries.Add(AS);
                     annoSerieById[AS.key] = AS;
                 }
@@ -196,6 +199,12 @@ namespace viewer {
                 if (matches.Contains(anno))continue;
                 matches.Add(anno);
 
+                // ri-esplorazione: si tiene l'istanza gia' nell'albero (il costruttore la aggiungerebbe
+                // di nuovo anche a Serie.myAnnoSeries)
+                if (annoSerieById.TryGetValue(objectKey(idSerie, anno), out AnnoSerie known)) {
+                    res.Add(known);
+                    continue;
+                }
                 AnnoSerie AS = new AnnoSerie(idSerie, anno);
                 annoSeries.Add(AS);
                 res.Add(AS);

@@ -91,10 +91,63 @@ namespace viewer {
             string json = File.ReadAllText(filePath);
 
             // Converte la stringa JSON in una lista di oggetti Registro
-            registri = JsonConvert.DeserializeObject<List<Registro>>(json);
-            foreach (Registro s in registri) {
-                registroById[s.idRegistro] = s;
+            var all = JsonConvert.DeserializeObject<List<Registro>>(json);
+
+            // I file salvati prima della correzione possono contenere piu' copie della stessa posizione
+            // (ogni ri-esplorazione ne aggiungeva una). Per i dati dell'utente vince l'ultima copia di
+            // ogni registro, come prima; per la descrizione la prima copia di ogni posizione, che e'
+            // quella mostrata nell'albero.
+            var latest = new Dictionary<string, Registro>();
+            foreach (Registro r in all) {
+                latest[r.idRegistro] = r;
             }
+            registri = new List<Registro>();
+            var positions = new HashSet<string>();
+            var loaded = new Dictionary<string, Registro>();
+            foreach (Registro r in all) {
+                if (!positions.Add(r.idRegistro + "|" + r.parentKey))
+                    continue;
+                r.copyUserData(latest[r.idRegistro]);
+                registri.Add(r);
+                if (!loaded.ContainsKey(r.idRegistro))
+                    loaded[r.idRegistro] = r;
+            }
+            foreach (var kv in loaded) {
+                registroById[kv.Key] = kv.Value;
+            }
+        }
+
+        /// <summary>
+        /// Copia i dati dell'utente (manifest, indice, ultima pagina vista), che sono per registro e non per
+        /// posizione nell'albero: un indice decennale sta sia sotto il primo sia sotto l'ultimo anno.
+        /// </summary>
+        void copyUserData(Registro from) {
+            if (from == this)
+                return;
+            manifestId = from.manifestId;
+            manifest = from.manifest;
+            idRegistroIndice = from.idRegistroIndice;
+            nPaginaIndice = from.nPaginaIndice;
+            lastPageViewed = from.lastPageViewed;
+        }
+
+        /// <summary>
+        /// Registro in una posizione dell'albero (serie/anno/tipologia). Se la posizione e' gia' nota restituisce
+        /// l'istanza esistente, cosi' una ri-esplorazione non crea copie e non stacca i dati dell'utente;
+        /// se il registro e' noto in un'altra posizione la nuova istanza ne eredita i dati.
+        /// </summary>
+        static Registro findOrCreate(string anno, string idSerie, string kind, string idRegistro, string segnatura) {
+            string parent = AnnoSerieKind.objectKey(idSerie, anno, kind);
+            var existing = registri.FirstOrDefault(x => x.idRegistro == idRegistro && x.parentKey == parent);
+            if (existing != null)
+                return existing;
+            Registro r = new Registro(anno, idSerie, kind, idRegistro, segnatura);
+            if (registroById.TryGetValue(idRegistro, out Registro known))
+                r.copyUserData(known);
+            else
+                registroById[idRegistro] = r;
+            registri.Add(r);
+            return r;
         }
         static string fixKind(string kind) {
             if (kind.Contains(",")) kind = "\"" + kind + "\"";
@@ -108,6 +161,13 @@ namespace viewer {
         }
 
         public static void Save(string filePath = RegistroName) {
+            // Il codice modifica i dati dell'utente sull'istanza di registroById: le altre posizioni
+            // dello stesso registro vanno allineate, altrimenti al caricamento potrebbe vincere una copia vecchia
+            foreach (Registro r in registri) {
+                if (registroById.TryGetValue(r.idRegistro, out Registro current))
+                    r.copyUserData(current);
+            }
+
             // Converte la lista in una stringa JSON
             string json = JsonConvert.SerializeObject(registri, Formatting.Indented);
 
@@ -121,10 +181,7 @@ namespace viewer {
             if (match.Success) {
                 string idRegistro = match.Groups[1].Value; // Estrarre il codice
                 string segnaturaAttuale = "unico";
-                Registro r = new Registro(anno, idSerie, kind, idRegistro, segnaturaAttuale);
-                registri.Add(r);
-                res.Add(r);
-                registroById[r.idRegistro] = r;
+                res.Add(findOrCreate(anno, idSerie, kind, idRegistro, segnaturaAttuale));
                 return res;
             }
             else {
@@ -242,10 +299,7 @@ namespace viewer {
                 }
                 //string segnaturaAttuale = match.Groups[3].Success ? match.Groups[3].Value.Trim() : (matches.Count ==1? "unico": registro);
                                
-                Registro r = new Registro(anno,idSerie,kind, idRegistro, segnaturaAttuale);
-                registri.Add(r);
-                res.Add(r);
-                registroById[r.idRegistro] = r;
+                res.Add(findOrCreate(anno, idSerie, kind, idRegistro, segnaturaAttuale));
             }
             return res;
         }

@@ -74,8 +74,15 @@ namespace viewer {
             string json = File.ReadAllText(filePath);
 
             // Converte la stringa JSON in una lista di oggetti Registro
-            annoSeriesKind = JsonConvert.DeserializeObject<List<AnnoSerieKind>>(json);
-            foreach (AnnoSerieKind s in annoSeriesKind) {
+            // Scarta le copie (salvate prima della correzione sulle ri-esplorazioni): vince la prima,
+            // che e' quella mostrata nell'albero, come in Fondo/Serie/AnnoSerie
+            var all = JsonConvert.DeserializeObject<List<AnnoSerieKind>>(json);
+            annoSeriesKind = new List<AnnoSerieKind>();
+            var seen = new HashSet<string>();
+            foreach (AnnoSerieKind s in all) {
+                if (!seen.Add(s.idSerieAnnoKind))
+                    continue;
+                annoSeriesKind.Add(s);
                 annoSerieKindById[s.idSerieAnnoKind] = s;
             }
         }
@@ -116,10 +123,12 @@ namespace viewer {
             var typePattern = @"<a href=""/search-registry/\?tipologia=([^&""]+)&";
             foreach (Match match in Regex.Matches(html, typePattern, RegexOptions.Singleline)) {
                 var tipo = match.Groups[1].Value;
-                AnnoSerieKind a = new AnnoSerieKind(anno,idSerie, tipo);
-                annoSeriesKind.Add(a);
+                if (!annoSerieKindById.TryGetValue(objectKey(idSerie, anno, tipo), out AnnoSerieKind a)) {
+                    a = new AnnoSerieKind(anno, idSerie, tipo);
+                    annoSeriesKind.Add(a);
+                    annoSerieKindById[a.idSerieAnnoKind] = a;
+                }
                 res.Add(a);
-                annoSerieKindById[a.idSerieAnnoKind] = a;
 
                 // Il codice an_uaXXXX sta nell'url del redirect, non nell'html della pagina
                 var child = Registro.deriveRegistroFromPage(anno, idSerie, tipo, url);

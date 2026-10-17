@@ -118,6 +118,11 @@ namespace viewer {
                 foreach (Match match in matches) {
                     string codice = match.Groups[1].Value;
                     string nome = match.Groups[2].Value;
+                    if (fondoById.TryGetValue(codice, out Fondo known)) {
+                        // ri-esplorazione: si tiene l'istanza (e la descrizione) gia' nell'albero
+                        res.Add(known);
+                        continue;
+                    }
                     var f = new Fondo(idArchivio, codice, nome);
                     fondi.Add(f);
                     res.Add(f);
