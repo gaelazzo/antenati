@@ -25,6 +25,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\viewer\viewer.csproj" />
+    <ProjectReference Include="..\Gedcom.NET\Gedcom\Gedcom.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -32,9 +33,6 @@
     <Reference Include="System.Drawing" />
     <Reference Include="System.Net.Http" />
     <Reference Include="System.Web" />
-    <Reference Include="Gedcom">
-      <HintPath>..\viewer\bin\$(Configuration)\Gedcom.dll</HintPath>
-    </Reference>
     <Reference Include="GedcomParser">
       <HintPath>..\Gedcom.NET\GedcomParser\bin\Debug\GedcomParser.dll</HintPath>
     </Reference>

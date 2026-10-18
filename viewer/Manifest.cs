@@ -79,6 +79,29 @@ namespace viewer {
         }
         static Dictionary<string, Manifest> allManifest = new Dictionary<string, Manifest>();
 
+        // LoadManifest gira sia dall'esplorazione (thread di pool) sia dall'interfaccia (selezione di un registro).
+        // Il lock copre solo gli accessi al dizionario, non il download: dentro un lock non si puo' fare await.
+        static readonly object allManifestLock = new object();
+
+        static bool tryGetLoaded(string manifestId, out Manifest manifest) {
+            lock (allManifestLock) {
+                return allManifest.TryGetValue(manifestId, out manifest);
+            }
+        }
+
+        /// <summary>
+        /// Registra il manifest caricato. Se nel frattempo un altro thread ha caricato lo stesso manifest
+        /// restituisce quello, cosi' tutti usano la stessa istanza.
+        /// </summary>
+        static Manifest remember(string manifestId, Manifest manifest) {
+            lock (allManifestLock) {
+                if (allManifest.TryGetValue(manifestId, out Manifest known))
+                    return known;
+                allManifest[manifestId] = manifest;
+                return manifest;
+            }
+        }
+
 		async Task GetAllImageSizesAsync(IEnumerable<string> ids) {
 			var tasks = ids.Select(ManifestLoader.LoadInfoJsonAsync);
 			var results = await Task.WhenAll(tasks);
@@ -91,8 +114,8 @@ namespace viewer {
 		}
 
 		public static async Task<Manifest> LoadManifest(string manifestId) {
-            if (allManifest.ContainsKey(manifestId)) {
-                return allManifest[manifestId];
+            if (tryGetLoaded(manifestId, out Manifest loaded)) {
+                return loaded;
             }
             string filename = manifestFileName(manifestId);
             if (File.Exists(filename)) {
@@ -102,8 +125,7 @@ namespace viewer {
                 foreach (var item in manifest.mapPage) {
                     manifest.pageDecode[item.Value]= item.Key;
                 }
-                allManifest[manifestId] = manifest;
-                return manifest;
+                return remember(manifestId, manifest);
             }
 
             //manifest address:
@@ -114,11 +136,16 @@ namespace viewer {
             }
             Manifest m = fromJson(manifestJson);
 
+            // Se durante il download un altro thread ha gia' caricato e salvato lo stesso manifest,
+            // si usa quello senza riscrivere il file
+            if (tryGetLoaded(manifestId, out loaded)) {
+                return loaded;
+            }
+
             //await m.GetAllImageSizesAsync(imageIds);
 			string jsonData = JsonConvert.SerializeObject(m, Formatting.Indented);
             SafeFile.WriteAllText(filename, jsonData);
-            allManifest[manifestId] = m;
-            return m;
+            return remember(manifestId, m);
         }
 
         /// <summary>

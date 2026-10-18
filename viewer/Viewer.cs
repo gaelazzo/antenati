@@ -63,6 +63,14 @@ namespace viewer {
 			return fPath;
         }
 
+        // savedFiles e' toccato dal caricamento della pagina e dal precaricamento, che girano insieme
+        // su thread diversi, e da "Cancella piccoli": va usato sempre sotto hashSemaphore
+        void forgetSavedFile(string name) {
+            lock (hashSemaphore) {
+                savedFiles.Remove(name);
+            }
+        }
+
         void addRequest(string code) {
             lock (hashSemaphore) {
                 existingRequests.Add(PathFromCode(code));
@@ -588,8 +596,7 @@ namespace viewer {
 			foreach (string file in files) {
 				try {
 					File.Delete(file);
-                    savedFiles.Remove(Path.GetFileNameWithoutExtension(file));
-                    esistenti.Remove(file);
+                    forgetSavedFile(Path.GetFileNameWithoutExtension(file));
 					Console.WriteLine($"Cancellato: {Path.GetFileName(file)}");
 				}
 				catch (Exception ex) {
@@ -635,7 +642,7 @@ namespace viewer {
         }
 
         /// <summary>
-        /// Carica l'immagine corrispondente al codice specificato e la aggiunge a esistenti e savedFiles
+        /// Carica l'immagine corrispondente al codice specificato e la aggiunge a savedFiles
         /// </summary>
         /// <param name="code"></param>
         /// <param name="width"></param>
@@ -646,7 +653,9 @@ namespace viewer {
             if (!pageDecode.ContainsKey(code))
                 return null;
             string fPath = PathFromCode(code);
-            if (savedFiles.Contains(extendCode(code))) {
+            bool known;
+            lock (hashSemaphore) { known = savedFiles.Contains(extendCode(code)); }
+            if (known) {
                 if (File.Exists(fPath)) {
                     Console.WriteLine($"File {code} già presente in savedFiles come {extendCode(code)}");
                     return fPath;
@@ -656,7 +665,7 @@ namespace viewer {
                 // un path inesistente faceva poi fallire LoadBitmapUnlocked. Rimuovo la
                 // voce stale e proseguo a ri-scaricare l'immagine.
                 Console.WriteLine($"File {code} in savedFiles ma assente su disco: rimuovo voce stale e riscarico");
-                savedFiles.Remove(extendCode(code));
+                forgetSavedFile(extendCode(code));
 			}
             
             try {
@@ -696,12 +705,12 @@ namespace viewer {
                         registerFailure(code);
 						return null;
                     }
-                    esistenti.Add(PathFromCode(code));
-
                     img.Dispose();
 
-                    savedFiles.Add(extendCode(code));
-                    lock (hashSemaphore) { failCount.Remove(code); }
+                    lock (hashSemaphore) {
+                        savedFiles.Add(extendCode(code));
+                        failCount.Remove(code);
+                    }
 
                     removeRequest(code);
                 }
@@ -1321,7 +1330,6 @@ namespace viewer {
             }
 
         }
-        HashSet<string> esistenti = new HashSet<string>();
 
         bool checkError(string code, int step = 0) {
             if (pageDecode == null)
@@ -1881,19 +1889,6 @@ namespace viewer {
                 }
             }
             
-        }
-        void voidStartValues() {
-            if (System.IO.File.Exists("start.txt")) {
-                var n = System.IO.File.ReadAllText("start.txt");
-                StringReader sr = new StringReader(n);
-                while (sr.Peek() > -1) {
-                    string line = sr.ReadLine().Trim();
-                    if (string.IsNullOrEmpty(line))
-                        continue;
-                    string[] pieces = line.Split(';');
-                    esistenti.Add(pieces[1]);
-                }
-            }
         }
 
         Dictionary<string, Squeeze> important = new Dictionary<string, Squeeze>();
@@ -3049,9 +3044,7 @@ namespace viewer {
 
                     var f = new FileInfo(fPath);
                     if (f.Length < 10000) {
-                        if (savedFiles.Contains(fPath.Replace("data\\", "").Replace(".jpg", ""))) {
-                            savedFiles.Remove(fPath.Replace("data\\", "").Replace(".jpg", ""));
-                        }
+                        forgetSavedFile(fPath.Replace("data\\", "").Replace(".jpg", ""));
                         System.IO.File.Delete(fPath);
                         continue;
                     }
@@ -3060,9 +3053,7 @@ namespace viewer {
                     var img = LoadBitmapUnlocked(fPath);
                     if (img?.Height < 1000 || img?.Width < 1000) {
                         img.Dispose();
-                        if (savedFiles.Contains(fPath.Replace("data\\", "").Replace(".jpg", ""))) {
-                            savedFiles.Remove(fPath.Replace("data\\", "").Replace(".jpg", ""));
-                        }
+                        forgetSavedFile(fPath.Replace("data\\", "").Replace(".jpg", ""));
                         System.IO.File.Delete(fPath);
                         continue;
                     }

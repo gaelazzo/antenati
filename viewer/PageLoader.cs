@@ -13,9 +13,16 @@ namespace viewer {
     public static class PageLoader {
 		
 		public static CookieCollection cookies = new CookieCollection();
+
+        // Ogni richiesta aggiorna i cookie, e le richieste partono insieme da thread diversi
+        // (pagina corrente, precaricamento, esplorazione): CookieCollection non e' thread-safe
+        static readonly object cookiesLock = new object();
+
         public static string getCookie(string name) {
-            foreach (Cookie cookie in cookies) {
-              if (cookie.Name==name) return cookie.Value;
+            lock (cookiesLock) {
+                foreach (Cookie cookie in cookies) {
+                  if (cookie.Name==name) return cookie.Value;
+                }
             }
             return null;
         }
@@ -66,18 +73,20 @@ namespace viewer {
 
                     var responseCookies = cookieContainer.GetCookies(uri);
 
-                    foreach (Cookie cookie in responseCookies) {
-                        // Verifica se il cookie esiste già e, in tal caso, aggiornalo
-                        var existingCookie = cookies[cookie.Name];
-                        if (existingCookie != null && cookie.Value!="") {
-                            existingCookie.Value = cookie.Value;
+                    lock (cookiesLock) {
+                        foreach (Cookie cookie in responseCookies) {
+                            // Verifica se il cookie esiste già e, in tal caso, aggiornalo
+                            var existingCookie = cookies[cookie.Name];
+                            if (existingCookie != null && cookie.Value!="") {
+                                existingCookie.Value = cookie.Value;
+                            }
+                            else {
+                                cookies.Add(cookie); // Aggiungi il cookie aggiornato
+							    Console.WriteLine($"Cookie: {cookie.Name} = {cookie.Value}");
+
+						    }
+
                         }
-                        else {
-                            cookies.Add(cookie); // Aggiungi il cookie aggiornato
-							Console.WriteLine($"Cookie: {cookie.Name} = {cookie.Value}");
-
-						}
-
                     }
 
                     //foreach (var head in client.DefaultRequestHeaders) {

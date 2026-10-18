@@ -30,6 +30,11 @@ namespace viewer.Tests {
             File.WriteAllText(Path.Combine(Root, Archivio.archiveName), "[]");
             originalDir = Environment.CurrentDirectory;
             Environment.CurrentDirectory = Root;
+
+            // Come Program.Main: il codice blocca su .Result (sync-over-async) e i test di concorrenza
+            // lanciano decine di richieste insieme; con i thread minimi di default il pool cresce di
+            // 1-2 thread al secondo e ogni richiesta resta in coda per secondi
+            System.Threading.ThreadPool.SetMinThreads(64, 64);
         }
 
         [OneTimeTearDown]

@@ -218,6 +218,15 @@ msbuild viewer.Tests\viewer.Tests.csproj -restore -p:Configuration=Debug
 dotnet test viewer.Tests\viewer.Tests.csproj --no-build
 ```
 
+Se il Viewer è aperto, `bin\Debug\viewer.exe` è bloccato e la compilazione
+fallisce: si può compilare in un'altra cartella, indicando dove trovare le DLL
+che il progetto prende da `bin\Debug` (per esempio BitlyAPI):
+
+```powershell
+msbuild viewer.Tests\viewer.Tests.csproj -restore -p:Configuration=Debug -p:OutDir=C:\temp\viewer-tests\ "-p:ReferencePath=$PWD\viewer\bin\Debug\"
+dotnet test C:\temp\viewer-tests\viewer.Tests.dll
+```
+
 I test normali non vanno in rete: lavorano in una cartella temporanea, usano
 pagine di Antenati salvate in `viewer.Tests/Fixtures/` e un server HTTP locale
 al posto di iiif/dam. I test che interrogano il sito vero sono esclusi di

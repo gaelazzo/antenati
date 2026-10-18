@@ -177,7 +177,6 @@ namespace viewer.Tests {
             Priv.Set(v, "mapPage", mapPage);
             Priv.Set(v, "pageDecode", pageDecode);
             Priv.Set(v, "savedFiles", new HashSet<string>());
-            Priv.Set(v, "esistenti", new HashSet<string>());
             Priv.Set(v, "existingRequests", new HashSet<string>());
             Priv.Set(v, "failCount", new Dictionary<string, int>());
             Priv.Set(v, "Sdownload", new Semaphore(5, 20));
@@ -276,6 +275,21 @@ namespace viewer.Tests {
             string path = LoadImage(code);
             Assert.That(path, Is.Not.Null);
             Assert.That(File.ReadAllBytes(path), Is.EqualTo(Jpeg));
+        }
+
+        [Test]
+        public void LoadImage_InParallelo_SavedFilesCompleto() {
+            // come il caricamento della pagina e il precaricamento, che girano insieme su thread diversi
+            var codes = Enumerable.Range(0, 60).Select(_ => NewCode()).ToArray();
+            PrepareRegister(codes);
+            server.Handler = _ => Image(Jpeg);
+
+            var tasks = codes.Select(c => System.Threading.Tasks.Task.Run(() => LoadImage(c))).ToArray();
+            System.Threading.Tasks.Task.WaitAll(tasks);
+
+            Assert.That(tasks.Select(t => t.Result), Has.None.Null);
+            Assert.That(SavedFiles.Count, Is.EqualTo(codes.Length));
+            Assert.That(codes.All(c => SavedFiles.Contains(Priv.Call<string>(v, "extendCode", c))), Is.True);
         }
 
         [Test]
