@@ -80,10 +80,6 @@
     <Reference Include="Flurl, Version=2.2.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\Flurl.2.2.0\lib\netstandard1.4\Flurl.dll</HintPath>
     </Reference>
-    <Reference Include="GedcomParser, Version=1.0.9140.16110, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\Gedcom.NET\GedcomParser\bin\Debug\GedcomParser.dll</HintPath>
-      <SpecificVersion>False</SpecificVersion>
-    </Reference>
     <Reference Include="HtmlAgilityPack, Version=1.11.72.0, Culture=neutral, PublicKeyToken=bd319b19eaf3b43a, processorArchitecture=MSIL">
       <HintPath>..\packages\HtmlAgilityPack.1.11.72\lib\Net45\HtmlAgilityPack.dll</HintPath>
     </Reference>
@@ -349,6 +345,10 @@
     <ProjectReference Include="..\Gedcom.NET\Gedcom\Gedcom.csproj">
       <Project>{872ae81c-2178-4d2b-9077-34a8ad1595d9}</Project>
       <Name>Gedcom</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Gedcom.NET\GedcomParser\GedcomParser.csproj">
+      <Project>{1cacb4ed-a0ac-49b0-bfcf-3eba26df558c}</Project>
+      <Name>GedcomParser</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
