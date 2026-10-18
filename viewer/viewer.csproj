@@ -71,8 +71,8 @@
     <SignManifests>false</SignManifests>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="BitlyAPI">
-      <HintPath>..\..\..\BitlyAPI-master\BitlyAPI-master\BitlyApiV4\bin\Debug\net45\BitlyAPI.dll</HintPath>
+    <Reference Include="BitlyAPI, Version=4.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\BitlyAPI.4.0.0\lib\net45\BitlyAPI.dll</HintPath>
     </Reference>
     <Reference Include="Emgu.CV, Version=4.9.0.5494, Culture=neutral, PublicKeyToken=7281126722ab4438, processorArchitecture=MSIL">
       <HintPath>..\packages\Emgu.CV.4.9.0.5494\lib\netstandard2.0\Emgu.CV.dll</HintPath>

@@ -219,11 +219,10 @@ dotnet test viewer.Tests\viewer.Tests.csproj --no-build
 ```
 
 Se il Viewer è aperto, `bin\Debug\viewer.exe` è bloccato e la compilazione
-fallisce: si può compilare in un'altra cartella, indicando dove trovare le DLL
-che il progetto prende da `bin\Debug` (per esempio BitlyAPI):
+fallisce: si può compilare in un'altra cartella:
 
 ```powershell
-msbuild viewer.Tests\viewer.Tests.csproj -restore -p:Configuration=Debug -p:OutDir=C:\temp\viewer-tests\ "-p:ReferencePath=$PWD\viewer\bin\Debug\"
+msbuild viewer.Tests\viewer.Tests.csproj -restore -p:Configuration=Debug -p:OutDir=C:\temp\viewer-tests\
 dotnet test C:\temp\viewer-tests\viewer.Tests.dll
 ```
 
