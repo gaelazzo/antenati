@@ -36,7 +36,8 @@ namespace viewer {
 
     public partial class Viewer : Form {
         static object hashSemaphore = new object();
-        HashSet<string> existingRequests = new HashSet<string>();
+        // Download di immagini in corso, uno per codice (sostituisce existingRequests): vedi loadImage
+        InFlightDownloads downloads = new InFlightDownloads();
         // Conteggio dei fallimenti di download per codice: serve solo a fermare il retry automatico
         // dopo qualche tentativo (vedi timer1_Tick), NON a blacklistare la pagina in modo permanente.
         // Un successo azzera il contatore (loadImage), quindi ri-navigando si ritenta sempre.
@@ -71,12 +72,6 @@ namespace viewer {
             }
         }
 
-        void addRequest(string code) {
-            lock (hashSemaphore) {
-                existingRequests.Add(PathFromCode(code));
-            }
-        }
-
         // Incrementa il contatore di fallimenti del codice. Dopo qualche fallimento il timer
         // smette di ritentare automaticamente (niente martellamento dello stesso URL), ma la
         // pagina NON viene bloccata: ri-navigando si ritenta e un successo azzera il contatore.
@@ -99,35 +94,6 @@ namespace viewer {
 
             //return $"https://iiif-antenati.cultura.gov.it/iiif/2/{code}/full/{width},/0/default.jpg";
 
-        }
-
-		void removeRequest(string code) {
-            lock (hashSemaphore) {
-                Console.WriteLine($"Rimuovo richiesta {code}");
-                if (existingRequests.Contains(PathFromCode(code)))
-                    existingRequests.Remove(PathFromCode(code));
-            }
-        }
-
-		/// <summary>
-		/// Checks if a file request is already in progress or the file already exists
-		/// </summary>
-		/// <param name="code"></param>
-		/// <returns></returns>
-		bool checkFileRequestExists(string code) {
-            lock (hashSemaphore) {
-                if (existingRequests.Contains(PathFromCode(code)))
-                    return true;
-            }
-
-            if (System.IO.File.Exists(PathFromCode(code))) {
-                lock (hashSemaphore) {
-                    existingRequests.Add(PathFromCode(code));
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         class noteToAdd {
@@ -182,6 +148,7 @@ namespace viewer {
 
         public Viewer() {
             InitializeComponent();
+            wireDimensionBox();
             // Enable double-buffering on picture and panel to reduce flicker during zoom/pan
             try {
                 typeof(Control).GetProperty("DoubleBuffered", BindingFlags.NonPublic | BindingFlags.Instance)
@@ -225,6 +192,10 @@ namespace viewer {
 
             RegNode.fillTree(treeMain.Nodes);
             readStartValues();
+            // timer1_Tick non carica pagine finche' txtPageNum ha il focus (l'utente sta scrivendo un
+            // numero), e all'apertura il focus finiva proprio li': la pagina iniziale non arrivava
+            // finche' non si cliccava altrove. Quando la finestra compare, sposto il focus sull'immagine.
+            Shown += (s, e) => { if (txtPageNum.Focused) ActiveControl = imgPanel; };
 
             InitWebView();
             //btnCalcolaCitta_Click(null, null);
@@ -502,17 +473,9 @@ namespace viewer {
         /// <param name="sender"></param>
         /// <param name="e"></param>
         private void btnGo_Click(object sender, EventArgs e) {
-            if (mapPage == null)
-                return;
-            int n = getNum();
-            if (!mapPage.ContainsKey(n))
-                return;
-            string code = mapPage[n];
-            if (n != 0) {
-                removeRequest(PathFromCode(code));
-            }
-
-            currentImage = 0;
+            // Prima chiamava removeRequest(PathFromCode(code)), che riconvertiva il percorso in percorso
+            // e non toglieva mai niente: la ricarica non funzionava e si andava avanti e indietro.
+            forceReload(getNum());
         }
 
         private int currPrecaching = 0;
@@ -591,6 +554,8 @@ namespace viewer {
         }
 
         void deleteCache() {
+            if (!Directory.Exists("data"))
+                return;
 			string[] files = Directory.GetFiles("data", "*.jpg", SearchOption.TopDirectoryOnly);
 
 			foreach (string file in files) {
@@ -657,7 +622,7 @@ namespace viewer {
             lock (hashSemaphore) { known = savedFiles.Contains(extendCode(code)); }
             if (known) {
                 if (File.Exists(fPath)) {
-                    Console.WriteLine($"File {code} già presente in savedFiles come {extendCode(code)}");
+                    Console.WriteLine($"[{ora()}] File {code} già presente in savedFiles come {extendCode(code)}");
                     return fPath;
                 }
                 // Voce "fantasma": era in savedFiles ma il file non c'e' piu' su disco
@@ -667,69 +632,98 @@ namespace viewer {
                 Console.WriteLine($"File {code} in savedFiles ma assente su disco: rimuovo voce stale e riscarico");
                 forgetSavedFile(extendCode(code));
 			}
-            
+            else if (File.Exists(fPath) && !downloads.IsInFlight(code)) {
+                // su disco ma non registrato (come faceva checkFileRequestExists): lo si usa
+                lock (hashSemaphore) { savedFiles.Add(extendCode(code)); }
+                return fPath;
+            }
+
+            // Un solo download per immagine: se e' gia' in corso (precache, timer) lo si aspetta.
+            // Il percorso torna solo quando il file e' davvero su disco, o null se e' fallito/annullato.
+            return await downloads.GetOrStart(code, ct => downloadImage(code, fPath, ct));
+        }
+
+        /// <summary>Scarica e verifica l'immagine; null se fallita (contata in failCount) o annullata (non contata)</summary>
+        async Task<string> downloadImage(string code, string fPath, CancellationToken cancel) {
             try {
-                if (!checkFileRequestExists(code)) {
-                    addRequest(code);
-                    Console.WriteLine($"Aggiungo in coda richiesta per {code}");
-                    if (!await queueDownloadFile(code,  fPath, false)) {
-                        removeRequest(code);
+                Console.WriteLine($"[{ora()}] Aggiungo in coda richiesta per {code}");
+                if (!await queueDownloadFile(code, fPath, false, cancel)) {
+                    // un annullamento non e' un fallimento del sito: non deve far abbandonare la pagina
+                    if (!cancel.IsCancellationRequested)
                         registerFailure(code);
-                        return null;
-                    }
+                    return null;
+                }
 
-                    var f = new FileInfo(fPath);
-                    if (f.Length < 10000) {
-						File.Delete(fPath);
-                        removeRequest(code);
-                        return null;
-                    }
+                var f = new FileInfo(fPath);
+                if (f.Length < 10000) {
+                    File.Delete(fPath);
+                    return null;
+                }
 
-					Image img = LoadBitmapUnlocked(fPath);
+                Image img = LoadBitmapUnlocked(fPath);
 
-                    if (img == null) {
-                        // File scaricato ma non decodificabile (parziale/corrotto): elimina,
-                        // rimuovi dalla coda e conta come fallimento. Prima qui andava in NRE.
-                        try { if (File.Exists(fPath)) File.Delete(fPath); } catch { }
-                        removeRequest(code);
-                        registerFailure(code);
-						return null;
-                    }
+                if (img == null) {
+                    // File scaricato ma non decodificabile (parziale/corrotto): elimina e conta come fallimento
+                    try { if (File.Exists(fPath)) File.Delete(fPath); } catch { }
+                    registerFailure(code);
+                    return null;
+                }
 
-                    if (img.Height < 100 || img.Width < 100) {
-                        // Segnaposto servito dal sito al posto dell'immagine: va cancellato, altrimenti
-                        // al giro dopo checkFileRequestExists lo trova su disco e resta in cache
-                        img.Dispose();
-                        try { if (File.Exists(fPath)) File.Delete(fPath); } catch { }
-                        removeRequest(code);
-                        registerFailure(code);
-						return null;
-                    }
+                if (img.Height < 100 || img.Width < 100) {
+                    // Segnaposto servito dal sito al posto dell'immagine: va cancellato, altrimenti
+                    // al giro dopo lo si troverebbe su disco e resterebbe in cache
                     img.Dispose();
+                    try { if (File.Exists(fPath)) File.Delete(fPath); } catch { }
+                    registerFailure(code);
+                    return null;
+                }
+                img.Dispose();
 
-                    lock (hashSemaphore) {
-                        savedFiles.Add(extendCode(code));
-                        failCount.Remove(code);
-                    }
-
-                    removeRequest(code);
+                lock (hashSemaphore) {
+                    savedFiles.Add(extendCode(code));
+                    failCount.Remove(code);
                 }
                 return fPath;
             }
             catch (Exception e) {
-                MessageBox.Show(e.ToString(), "Errore");
-                if (File.Exists(fPath)) {
-                    try {
-                        File.Delete(fPath);
-                    }
-                    catch {
-
-                    }
-                }
-
-                removeRequest(code);
+                // gira in un thread di background: niente MessageBox (finestre orfane a raffica col sito lento)
+                Console.WriteLine($"[{ora()}] {code}: errore in loadImage: {e.GetType().Name}: {e.Message}");
+                try { if (File.Exists(fPath)) File.Delete(fPath); } catch { }
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Annulla i download di pagine lontane da page (oltre la finestra di precache) o di un altro
+        /// registro. Le pagine vicine restano: tornandoci si riaggancia il download in corso invece
+        /// di ripartire da zero. Per forzare una nuova richiesta c'e' forceReload (pulsante Go).
+        /// </summary>
+        void keepDownloadsNear(int page) {
+            var map = mapPage;
+            if (map == null)
+                return;
+            int w = Math.Max(cacheSize, 1) + 1;
+            var keep = new HashSet<string>();
+            for (int p = page - w; p <= page + w; p++)
+                if (map.TryGetValue(p, out string c))
+                    keep.Add(c);
+            int n = downloads.CancelAllExcept(keep.Contains);
+            if (n > 0)
+                Console.WriteLine($"[{ora()}] Annullati {n} download di pagine lontane dalla {page}");
+        }
+
+        /// <summary>
+        /// Ricarica forzata della pagina (pulsante Go): annulla il download in corso, azzera i fallimenti
+        /// (dopo 3 il timer smette di ritentare) e fa ripartire il caricamento al tick successivo.
+        /// </summary>
+        void forceReload(int page) {
+            if (mapPage == null || !mapPage.TryGetValue(page, out string code))
+                return;
+            if (downloads.Cancel(code))
+                Console.WriteLine($"[{ora()}] {code}: ricarica forzata, download in corso annullato");
+            lock (hashSemaphore) { failCount.Remove(code); }
+            nEffettivo = 0;
+            currentImage = 0;
         }
 
         
@@ -850,7 +844,7 @@ namespace viewer {
 
                 // lastImage = rendered;
                
-                Console.WriteLine("Nuova immagine visualizzata");
+                Console.WriteLine($"[{ora()}] Nuova immagine visualizzata");
 				// 3. Ripristino lo scroll
 				if (thereWasImage) {
                     xScroll = (int)Math.Round(lastXRate * renderWidth);
@@ -1135,7 +1129,9 @@ namespace viewer {
 
 
             inTimer = true;
-
+            // try/finally: un'eccezione a meta' tick lasciava inTimer = true per sempre e il timer
+            // non faceva piu' nulla (nessuna pagina caricata, nessun messaggio nel log).
+            try {
 
 
             if (webView.Source?.AbsoluteUri != null)
@@ -1167,8 +1163,36 @@ namespace viewer {
             if (requestedImage != 0)
                 currentImage = requestedImage;
 
-            if (requestedImage != nEffettivo && updating == false && requestedImage != 0) {
-                updating = true;
+            // Cambiata pagina o registro: via i download di pagine ormai lontane (vedi keepDownloadsNear)
+            if (requestedImage != 0 && (requestedImage != lastKeptPage || !ReferenceEquals(mapPage, lastKeptMap))) {
+                lastKeptPage = requestedImage;
+                lastKeptMap = mapPage;
+                keepDownloadsNear(requestedImage);
+            }
+
+            // Consuma l'immagine in attesa SOLO se possiamo davvero disegnarla, e segna nEffettivo
+            // (= pagina realmente a video, e quindi quando il numero smette di essere rosso) SOLO
+            // dopo il disegno effettivo. Se displayImage venisse saltato (drawing in corso) la lascio
+            // in coda per il tick successivo invece di perderla disallineando nEffettivo dal video.
+            // Va fatto PRIMA di decidere se avviare un caricamento: altrimenti la pagina appena
+            // pronta (nEffettivo ancora vecchio) veniva caricata e disegnata una seconda volta.
+            var pending = imageToDisplay;
+            if (pending != null && !drawing) {
+                int pendingNum = imageToDisplayNum;
+                imageToDisplay = null;
+                displayImage(pending);
+                nEffettivo = pendingNum;
+                Console.WriteLine($"[{ora()}] Pagina {pendingNum} a video" +
+                                  (mapPage.ContainsKey(pendingNum) ? $" ({mapPage[pendingNum]})" : ""));
+                if (toPushHistory) {
+                    toPushHistory = false;
+                    pushHistory(getMark());
+                }
+            }
+
+            // Quando avviare il caricamento della pagina richiesta: vedi PageLoadScheduler.
+            int staged = imageToDisplay != null ? imageToDisplayNum : 0;
+            if (pageLoads.TryBegin(requestedImage, nEffettivo, staged)) {
 
                 //tabControl1.SelectedTab = tabPage1;
                 new Task(async () => {
@@ -1189,7 +1213,6 @@ namespace viewer {
                                 lock (hashSemaphore) { failCount.TryGetValue(mapPage[saved], out fails); }
                                 if (fails >= 3 && saved == currentImage)
                                     nEffettivo = saved;
-                                updating = false;
                                 toMarkImportant = false;
                                 return;
                             }
@@ -1219,28 +1242,15 @@ namespace viewer {
                     }
                     catch {
                     }
-
-                    updating = false;
+                    finally {
+                        // anche dopo il return del ramo "pagina non caricata"
+                        pageLoads.End(requestedImage);
+                    }
 
                 }).Start();
             }
 
-            // Consuma l'immagine in attesa SOLO se possiamo davvero disegnarla, e segna nEffettivo
-            // (= pagina realmente a video, e quindi quando il numero smette di essere rosso) SOLO
-            // dopo il disegno effettivo. Se displayImage venisse saltato (drawing in corso) la lascio
-            // in coda per il tick successivo invece di perderla disallineando nEffettivo dal video.
-            var pending = imageToDisplay;
-            if (pending != null && !drawing) {
-                int pendingNum = imageToDisplayNum;
-                imageToDisplay = null;
-                displayImage(pending);
-                nEffettivo = pendingNum;
-                if (toPushHistory) {
-                    toPushHistory = false;
-                    pushHistory(getMark());
-                }
-            }
-            // Gestisce i bottoni +1 e -1 
+            // Gestisce i bottoni +1 e -1
             manageBtnPiuUnoMenoUno(requestedImage);
 
             txtEffettivo.Text = nEffettivo.ToString();
@@ -1265,7 +1275,13 @@ namespace viewer {
             else {
                 setImportante();
             }
-            inTimer = false;
+            }
+            catch (Exception ex) {
+                Console.WriteLine($"[{ora()}] timer1_Tick: {ex.GetType().Name}: {ex.Message}");
+            }
+            finally {
+                inTimer = false;
+            }
 
         }
         bool mouseOverBtnPiuUno = false;
@@ -1349,7 +1365,11 @@ namespace viewer {
             return false;
         }
 
-        private bool updating = false;
+        // Caricamenti di pagina avviati dal timer e non ancora finiti
+        private readonly PageLoadScheduler pageLoads = new PageLoadScheduler();
+        // Pagina e registro (mapPage) per cui keepDownloadsNear e' gia' stato chiamato
+        private int lastKeptPage = 0;
+        private object lastKeptMap = null;
 
         private int nEffettivo = 0;
 
@@ -1387,6 +1407,20 @@ namespace viewer {
             displayImage(lastImage);
         }
         float userZoom = 1.0f;
+
+        /// <summary>
+        /// Zoom salvato in start.txt (valore di trackZoom). Stessa scala di trackZoom_ValueChanged
+        /// (/1000: prima qui era /100, e se il valore coincideva col default della barra l'evento non
+        /// scattava e la prima pagina usciva 10 volte troppo grande). Valori fuori intervallo vengono
+        /// riportati ai limiti invece di lanciare l'eccezione che saltava il resto di start.txt.
+        /// </summary>
+        void applyZoomSetting(string value) {
+            if (!int.TryParse(value?.Trim(), out int z))
+                return;
+            z = Math.Max(trackZoom.Minimum, Math.Min(trackZoom.Maximum, z));
+            trackZoom.Value = z;
+            userZoom = z / 1000f;
+        }
         
 
         void zoomStepIn() {
@@ -1543,23 +1577,49 @@ namespace viewer {
         //}
 
 
-        public async Task<bool> queueDownloadFile(string code,  string path, bool forced = true) {
+        static string ora() => DateTime.Now.ToString("HH:mm:ss.fff");
+
+        // Il 18/10/2026, col server sotto carico, un'immagine richiedeva 16-77 s e 5 richieste su 16
+        // superavano i 100 s del timeout predefinito di .NET. Oltre ~125 s pero' risponde Cloudflare
+        // con 524, quindi aspettare di piu' non serve: 150 s. Non readonly: i test lo accorciano.
+        static TimeSpan imageTimeout = TimeSpan.FromSeconds(150);
+
+        public Task<bool> queueDownloadFile(string code, string path, bool forced = true) {
+            return queueDownloadFile(code, path, forced, CancellationToken.None);
+        }
+
+        /// <param name="cancel">annulla l'attesa del semaforo, la richiesta e la copia (pagina lasciata, Go)</param>
+        public async Task<bool> queueDownloadFile(string code,  string path, bool forced, CancellationToken cancel) {
             WebClient w = null;
+            bool acquired = false;
             string folder = Path.GetDirectoryName(path);
             if (!Directory.Exists(folder)) {
                 Directory.CreateDirectory(folder);
             }
 
             string fileName = Path.GetTempPath() + Guid.NewGuid().ToString() + ".jpg";
+            // Tempi del download, per capire se la lentezza e' del sito o del programma:
+            //  coda   = attesa del semaforo Sdownload (lato programma)
+            //  server = dalla richiesta alla risposta completa (elaborazione IIIF + trasferimento)
+            //  disco  = copia nel file temporaneo e nella cache data\
+            var swTot = System.Diagnostics.Stopwatch.StartNew();
+            long msCoda = 0, msServer = 0;
             try {
 
-                if (!forced)
-                    Sdownload.WaitOne();
+                if (!forced) {
+                    // attesa del posto annullabile: una pagina lasciata non deve restare in coda
+                    if (WaitHandle.WaitAny(new WaitHandle[] { Sdownload, cancel.WaitHandle }) != 0) {
+                        Console.WriteLine($"[{ora()}] {code}: annullato mentre era in coda");
+                        return false;
+                    }
+                    acquired = true;
+                }
+                msCoda = swTot.ElapsedMilliseconds;
 
 
                 string url =getImageUrlByCode(code);  //  "https://iiif-antenati.cultura.gov.it/iiif/2/LPbBpOd/full/956,/0/default.jpg"
 				currExploring = url;
-                Console.WriteLine($"Richiedo file immagine {url}");
+                Console.WriteLine($"[{ora()}] Richiedo file immagine {url}" + (msCoda > 100 ? $" (dopo {msCoda} ms in coda)" : ""));
 				Dictionary<string, string> cookies = new Dictionary<string, string>();
 
 				Dictionary<string, string> headers = new Dictionary<string, string>();
@@ -1574,7 +1634,9 @@ namespace viewer {
 				headers.Add("Sec-Fetch-Site", "same-site");
 				//headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36");
 
-				var response = PageLoader.getResponseMessage(url, HttpCompletionOption.ResponseContentRead, headers, cookies);
+				var swServer = System.Diagnostics.Stopwatch.StartNew();
+				var response = PageLoader.getResponseMessage(url, HttpCompletionOption.ResponseContentRead, headers, cookies, imageTimeout, cancel);
+				msServer = swServer.ElapsedMilliseconds;
 
 				// Cantaloupe (il server IIIF di Antenati) risponde 403 Forbidden quando la
 				// larghezza richiesta supera quella nativa dell'immagine: l'upscaling e'
@@ -1587,12 +1649,19 @@ namespace viewer {
 					response.Dispose();
 					url = getImageUrlByCode(code, true);
 					currExploring = url;
-					Console.WriteLine($"Richiedo file immagine {url}");
-					response = PageLoader.getResponseMessage(url, HttpCompletionOption.ResponseContentRead, headers, cookies);
+					Console.WriteLine($"[{ora()}] {code}: 403 dopo {msServer} ms, richiedo {url}");
+					swServer.Restart();
+					response = PageLoader.getResponseMessage(url, HttpCompletionOption.ResponseContentRead, headers, cookies, imageTimeout, cancel);
+					msServer += swServer.ElapsedMilliseconds;
 				}
 
+				if (cancel.IsCancellationRequested) {
+					Console.WriteLine($"[{ora()}] {code}: annullato dopo {msServer} ms");
+					response?.Dispose();
+					return false;
+				}
 				if (response == null || !response.IsSuccessStatusCode) {
-					Console.WriteLine($"HTTP Error {(int?)response?.StatusCode}: {response?.ReasonPhrase}");
+					Console.WriteLine($"[{ora()}] {code}: HTTP Error {(int?)response?.StatusCode}: {response?.ReasonPhrase} dopo {msServer} ms");
 					return false;
 				}
                 // Verifica Content-Length se disponibile
@@ -1601,7 +1670,7 @@ namespace viewer {
 
                 using (var fs = new FileStream(fileName, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true)) {
                     using (var stream = await response.Content.ReadAsStreamAsync()) {
-                        await stream.CopyToAsync(fs);
+                        await stream.CopyToAsync(fs, 81920, cancel);
                         await fs.FlushAsync();
                     }
                 }
@@ -1639,19 +1708,25 @@ namespace viewer {
                 }
 
                 System.IO.File.Delete(fileName);
+                long msTot = swTot.ElapsedMilliseconds;
+                Console.WriteLine($"[{ora()}] {code}: {(result ? "OK" : "SCARTATO")} {f.Length / 1024} KB in {msTot} ms " +
+                                  $"(coda {msCoda}, server {msServer}, disco {msTot - msCoda - msServer})");
                 if (currExploring == url)
                     currExploring = "";
                 return result;
             }
+            catch (OperationCanceledException) {
+                Console.WriteLine($"[{ora()}] {code}: annullato dopo {swTot.ElapsedMilliseconds} ms");
+            }
             catch (Exception e) {
-                string eee = e.ToString();
-                
-				Console.WriteLine("queueDownloadFile:"+e.Message);
+				Console.WriteLine($"[{ora()}] {code}: queueDownloadFile dopo {swTot.ElapsedMilliseconds} ms: {e.Message}");
 			}
             finally {
-                if (!forced)
+                if (acquired)
                     Sdownload.Release();
                 w?.Dispose();
+                // il file temporaneo resta se si esce prima della fine (annullamento, errore, dimensione errata)
+                try { if (File.Exists(fileName)) File.Delete(fileName); } catch { }
             }
 
             return false;
@@ -1767,8 +1842,12 @@ namespace viewer {
                         continue;
                     string[] pieces = line.Split('§');
                     if (pieces[0] == "pageNum") {
+                        // NON scaricare qui la pagina: siamo nel costruttore, sul thread della UI, e la
+                        // catena di download e' sincrona fino alla risposta del server (.Result in
+                        // PageLoader): la finestra non compariva finche' il sito non rispondeva
+                        // (decine di secondi col server lento). Basta impostare il numero: la carica
+                        // timer1_Tick in background, come ogni altra pagina.
                         txtPageNum.Text = pieces[1];
-                        await viewImage(Convert.ToInt32(pieces[1]));
                     }
                     if (pieces[0] == "mainStart") {
                         string path = pieces[1];
@@ -1822,8 +1901,7 @@ namespace viewer {
                         txtAddress.Text = pieces[1];
                     }
                     if (pieces[0] == "zoom") {
-                        userZoom = Convert.ToInt32(pieces[1]) / 100f;
-                        trackZoom.Value = Convert.ToInt32(pieces[1]);
+                        applyZoomSetting(pieces[1]);
                     }
                     if (pieces[0] == "lastScrollX") {
                         xScroll = Convert.ToInt32(pieces[1]);
@@ -3040,29 +3118,60 @@ namespace viewer {
 
         private void btnCancellaPiccoli_Click(object sender, EventArgs e) {
             new Task(() => {
-                foreach (var fPath in Directory.EnumerateFiles("data", "*.jpg")) {
-
-                    var f = new FileInfo(fPath);
-                    if (f.Length < 10000) {
-                        forgetSavedFile(fPath.Replace("data\\", "").Replace(".jpg", ""));
-                        System.IO.File.Delete(fPath);
-                        continue;
-                    }
-
-
-                    var img = LoadBitmapUnlocked(fPath);
-                    if (img?.Height < 1000 || img?.Width < 1000) {
-                        img.Dispose();
-                        forgetSavedFile(fPath.Replace("data\\", "").Replace(".jpg", ""));
-                        System.IO.File.Delete(fPath);
-                        continue;
-                    }
-
-                    img.Dispose();
-
-                }
-
+                int n = deleteSmallImages("data");
+                Console.WriteLine($"[{ora()}] Cancella piccoli: {n} immagini tolte dalla cache");
             }).Start();
+        }
+
+        /// <summary>
+        /// Toglie da folder le immagini inutilizzabili e restituisce quante ne ha cancellate:
+        /// file sotto i 10.000 byte o illeggibili, segnaposto (altezza sotto 100 px) e immagini
+        /// piu' strette della larghezza attuale (min(1000, dimension); 1000 se dimension = 0).
+        /// Prima la soglia era 1000 px fissi su larghezza E altezza: con dimension 800 cancellava
+        /// tutta la cache e con 1000 le doppie pagine orizzontali; un file corrotto la fermava con
+        /// un'eccezione e uno bloccato interrompeva la scansione.
+        /// </summary>
+        int deleteSmallImages(string folder) {
+            if (!Directory.Exists(folder))
+                return 0;
+            int minWidth = dimension > 0 ? Math.Min(1000, dimension) : 1000;
+            int deleted = 0;
+            foreach (var fPath in Directory.EnumerateFiles(folder, "*.jpg")) {
+                try {
+                    bool small;
+                    if (new FileInfo(fPath).Length < 10000) {
+                        small = true;
+                    }
+                    else {
+                        Size? size = readImageSize(fPath);
+                        small = size == null || size.Value.Width < minWidth || size.Value.Height < 100;
+                    }
+                    if (!small)
+                        continue;
+                    File.Delete(fPath);
+                    forgetSavedFile(Path.GetFileNameWithoutExtension(fPath));
+                    deleted++;
+                }
+                catch (IOException) {
+                    // in uso (download o visualizzazione in corso): lo si ritrovera' la prossima volta
+                }
+                catch (UnauthorizedAccessException) {
+                }
+            }
+            return deleted;
+        }
+
+        /// <summary>Dimensioni lette dall'intestazione, senza decodificare l'immagine; null se illeggibile</summary>
+        static Size? readImageSize(string path) {
+            using (var s = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)) {
+                try {
+                    using (var img = Image.FromStream(s, false, false))
+                        return img.Size;
+                }
+                catch (ArgumentException) {
+                    return null;    // non e' un'immagine
+                }
+            }
         }
 
         public static Bitmap EqualizeHistogram(Bitmap inputBitmap) {
@@ -4755,20 +4864,29 @@ namespace viewer {
         }
 
         int dimension = 0;
-        private void txtDimensione_TextChanged(object sender, EventArgs e) {
-            if (String.IsNullOrEmpty(txtDimensione.Text)) {
-                dimension = 0;
-            }
-            else {
-                int dim = toIntOrDefault(txtDimensione.Text,0);
-                if (dim > 0) {
-                    dimension = dim;
+        /// <summary>
+        /// La dimensione scritta in txtDimensione si applica uscendo dal campo o con Invio, non a ogni
+        /// tasto: con TextChanged, scrivendo "2000" la cache veniva svuotata 4 volte e nel frattempo si
+        /// chiedevano al server immagini larghe 2, 20 e 200 px. Chiamato dal costruttore.
+        /// </summary>
+        void wireDimensionBox() {
+            txtDimensione.Leave += (s, e) => applyDimension();
+            txtDimensione.KeyDown += (s, e) => {
+                if (e.KeyCode == Keys.Enter) {
+                    applyDimension();
+                    e.SuppressKeyPress = true;
                 }
-                else {
-                    dimension = 0;
-                }
-            }
-            deleteCache();
+            };
+        }
+
+        void applyDimension() {
+            int oldDimension = dimension;
+            int dim = toIntOrDefault(txtDimensione.Text?.Trim() ?? "", 0);
+            dimension = dim > 0 ? dim : 0;   // vuoto o non valido = dimensione nativa (/full/max/)
+            // Le immagini in cache sono salvate per codice, senza larghezza: vanno buttate solo se la
+            // larghezza cambia davvero.
+            if (dimension != oldDimension)
+                deleteCache();
         }
     }
 

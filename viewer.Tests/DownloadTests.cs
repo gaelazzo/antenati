@@ -158,6 +158,31 @@ namespace viewer.Tests {
         }
 
         [Test]
+        public void Immagine_TimeoutPredefinito_PocoOltreIlTaglioDiCloudflare() {
+            // Cloudflare chiude con 524 intorno ai 125 s: aspettare di piu' tiene solo occupato il
+            // download (prima era 5 minuti); meno di 100 s (default .NET) perderebbe risposte lente valide
+            var t = (TimeSpan)typeof(Viewer).GetField("imageTimeout", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic).GetValue(null);
+            Assert.That(t.TotalSeconds, Is.InRange(130, 180));
+        }
+
+        [Test]
+        public void Immagine_ServerTroppoLento_TimeoutDelleImmagini() {
+            var field = typeof(Viewer).GetField("imageTimeout", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+            var saved = field.GetValue(null);
+            field.SetValue(null, TimeSpan.FromSeconds(1));
+            try {
+                server.Concurrent = true;
+                server.Handler = _ => { Thread.Sleep(3000); return Image(Jpeg); };
+                string path = Path.Combine(Sandbox.NewDir(), "a.jpg");
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                Assert.That(Download("LqaVpAR", path), Is.False);
+                Assert.That(sw.Elapsed.TotalSeconds, Is.LessThan(2.5), "queueDownloadFile deve usare imageTimeout");
+                Assert.That(File.Exists(path), Is.False);
+            }
+            finally { field.SetValue(null, saved); }
+        }
+
+        [Test]
         public void Immagine_ServerIrraggiungibile_False() {
             server.Dispose();
             Assert.That(Download("LqaVpAR", Path.Combine(Sandbox.NewDir(), "a.jpg")), Is.False);
@@ -177,9 +202,133 @@ namespace viewer.Tests {
             Priv.Set(v, "mapPage", mapPage);
             Priv.Set(v, "pageDecode", pageDecode);
             Priv.Set(v, "savedFiles", new HashSet<string>());
-            Priv.Set(v, "existingRequests", new HashSet<string>());
             Priv.Set(v, "failCount", new Dictionary<string, int>());
             Priv.Set(v, "Sdownload", new Semaphore(5, 20));
+            Priv.Set(v, "downloads", new InFlightDownloads());
+            Priv.Set(v, "cacheSize", 10);
+        }
+
+        // ---------- download in corso: riaggancio, annullamento, ricarica forzata ----------
+
+        static void WaitUntil(Func<bool> cond, int ms = 5000) {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            while (!cond()) {
+                if (sw.ElapsedMilliseconds > ms) Assert.Fail("condizione non raggiunta entro " + ms + " ms");
+                Thread.Sleep(20);
+            }
+        }
+
+        System.Threading.Tasks.Task<string> LoadImageAsync(string code) =>
+            System.Threading.Tasks.Task.Factory.StartNew(() => LoadImage(code), System.Threading.Tasks.TaskCreationOptions.LongRunning);
+
+        Dictionary<string, int> Fails => (Dictionary<string, int>)Priv.Get(v, "failCount");
+
+        [Test, CancelAfter(15000)]
+        public void LoadImage_StessaImmagineInParallelo_UnSoloDownloadEFileGiaPronto() {
+            // Prima: il secondo chiamante riceveva subito il percorso di un file non ancora scritto
+            string code = NewCode();
+            PrepareRegister(code);
+            server.Concurrent = true;
+            server.Handler = _ => { Thread.Sleep(1500); return Image(Jpeg); };
+
+            var first = LoadImageAsync(code);
+            WaitUntil(() => server.Requests.Count == 1);
+            var second = LoadImageAsync(code);
+            string p2 = second.Result;
+            bool existedWhenReturned = p2 != null && File.Exists(p2);
+
+            Assert.That(existedWhenReturned, Is.True, "il percorso va restituito quando il file c'e'");
+            Assert.That(first.Result, Is.EqualTo(p2));
+            Assert.That(server.Requests.Count, Is.EqualTo(1), "il secondo riaggancia il primo download");
+        }
+
+        [Test, CancelAfter(15000)]
+        public void LoadImage_PaginaLontanaAnnullata_NullSubitoESenzaFallimento() {
+            var codes = Enumerable.Range(0, 60).Select(_ => NewCode()).ToArray();
+            PrepareRegister(codes);
+            server.Concurrent = true;
+            server.Handler = _ => { Thread.Sleep(5000); return Image(Jpeg); };
+
+            var load = LoadImageAsync(codes[0]);           // pagina 1
+            WaitUntil(() => server.Requests.Count == 1);
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            Priv.Call(v, "keepDownloadsNear", 50);           // l'utente e' saltato a pagina 50
+
+            Assert.That(load.Result, Is.Null);
+            Assert.That(sw.Elapsed.TotalSeconds, Is.LessThan(2), "annullato, non atteso fino alla fine");
+            Assert.That(Fails.ContainsKey(codes[0]), Is.False, "un annullamento non e' un fallimento del sito");
+            Assert.That(File.Exists(Path.Combine("data", Priv.Call<string>(v, "extendCode", codes[0] + ".jpg"))), Is.False);
+
+            // tornando sulla pagina, il download riparte
+            server.Handler = _ => Image(Jpeg);
+            Assert.That(LoadImage(codes[0]), Is.Not.Null);
+            Assert.That(server.Requests.Count, Is.EqualTo(2));
+        }
+
+        [Test, CancelAfter(15000)]
+        public void LoadImage_PaginaVicina_NonAnnullata() {
+            var codes = Enumerable.Range(0, 60).Select(_ => NewCode()).ToArray();
+            PrepareRegister(codes);
+            server.Concurrent = true;
+            server.Handler = _ => { Thread.Sleep(1500); return Image(Jpeg); };
+
+            var load = LoadImageAsync(codes[2]);           // pagina 3 (precache)
+            WaitUntil(() => server.Requests.Count == 1);
+            Priv.Call(v, "keepDownloadsNear", 5);            // l'utente va avanti di due pagine
+
+            Assert.That(load.Result, Is.Not.Null);
+            Assert.That(server.Requests.Count, Is.EqualTo(1));
+        }
+
+        [Test, CancelAfter(15000)]
+        public void LoadImage_AnnullatoMentreAspettaIlSemaforo_EsceSenzaSbilanciarlo() {
+            string code = NewCode();
+            PrepareRegister(code);
+            var sem = new Semaphore(0, 20);                  // tutti i posti occupati
+            Priv.Set(v, "Sdownload", sem);
+            server.Handler = _ => Image(Jpeg);
+
+            var load = LoadImageAsync(code);
+            WaitUntil(() => ((InFlightDownloads)Priv.Get(v, "downloads")).IsInFlight(code));
+            Thread.Sleep(200);
+            ((InFlightDownloads)Priv.Get(v, "downloads")).Cancel(code);
+
+            Assert.That(load.Wait(2000), Is.True, "non deve restare appeso al semaforo");
+            Assert.That(load.Result, Is.Null);
+            Assert.That(server.Requests, Is.Empty);
+            Assert.That(sem.WaitOne(0), Is.False, "nessun Release senza WaitOne riuscito");
+        }
+
+        [Test, CancelAfter(15000)]
+        public void RicaricaForzata_DopoTreFallimenti_AzzeraERichiede() {
+            string code = NewCode();
+            PrepareRegister(code);
+            server.Handler = _ => Status(500, "Internal Server Error");
+            for (int i = 0; i < 3; i++) LoadImage(code);
+            Assert.That(Fails[code], Is.EqualTo(3));
+            Priv.Set(v, "nEffettivo", 1);                    // il timer l'aveva data per "mostrata"
+
+            Priv.Call(v, "forceReload", 1);
+
+            Assert.That(Fails.ContainsKey(code), Is.False);
+            Assert.That((int)Priv.Get(v, "nEffettivo"), Is.EqualTo(0), "cosi' il timer la richiede");
+            server.Handler = _ => Image(Jpeg);
+            Assert.That(LoadImage(code), Is.Not.Null);
+        }
+
+        [Test, CancelAfter(15000)]
+        public void RicaricaForzata_AnnullaIlDownloadInCorso() {
+            string code = NewCode();
+            PrepareRegister(code);
+            server.Concurrent = true;
+            server.Handler = _ => { Thread.Sleep(5000); return Image(Jpeg); };
+            var load = LoadImageAsync(code);
+            WaitUntil(() => server.Requests.Count == 1);
+
+            Priv.Call(v, "forceReload", 1);
+
+            Assert.That(load.Wait(2000), Is.True);
+            Assert.That(((InFlightDownloads)Priv.Get(v, "downloads")).IsInFlight(code), Is.False);
         }
 
         string LoadImage(string code) => Priv.Call<System.Threading.Tasks.Task<string>>(v, "loadImage", code).Result;
@@ -196,7 +345,7 @@ namespace viewer.Tests {
             Assert.That(path, Is.EqualTo(Path.Combine("data", Priv.Call<string>(v, "extendCode", code + ".jpg"))));
             Assert.That(File.Exists(path), Is.True);
             Assert.That(SavedFiles, Does.Contain(Priv.Call<string>(v, "extendCode", code)));
-            Assert.That((HashSet<string>)Priv.Get(v, "existingRequests"), Is.Empty, "la richiesta in corso va tolta");
+            WaitUntil(() => ((InFlightDownloads)Priv.Get(v, "downloads")).Count == 0);   // la richiesta in corso va tolta
         }
 
         [Test]

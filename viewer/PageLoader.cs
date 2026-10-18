@@ -30,7 +30,9 @@ namespace viewer {
 		public static HttpResponseMessage getResponseMessage(string url,
                 HttpCompletionOption opt = HttpCompletionOption.ResponseContentRead,
                 Dictionary<string, string> headers = null,
-                Dictionary<string,string> cookiesDict=null) {
+                Dictionary<string,string> cookiesDict=null,
+                TimeSpan? timeout = null,
+                System.Threading.CancellationToken cancel = default) {
 			var cookieContainer = new CookieContainer();
 			Uri uri = new Uri(url);
 
@@ -53,7 +55,11 @@ namespace viewer {
             }
 
             using (var client = new HttpClient(handler)) {
-				
+				// Default di HttpClient: 100 s. Il server IIIF sotto carico puo' metterci di piu'
+				// a preparare un'immagine: chi scarica immagini passa un timeout piu' lungo.
+				if (timeout.HasValue)
+					client.Timeout = timeout.Value;
+
 				// User-Agent obbligatorio
 				client.DefaultRequestHeaders.UserAgent.ParseAdd(
 					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
@@ -65,7 +71,7 @@ namespace viewer {
                     }
                 }
                 try {
-                    var response = client.GetAsync(url,opt).Result;
+                    var response = client.GetAsync(url, opt, cancel).Result;
 
                     Console.WriteLine(response.Content.Headers.ContentEncoding.FirstOrDefault());
 
@@ -98,7 +104,12 @@ namespace viewer {
                     return response;
                 }
                 catch (Exception ex) {
-                    Console.WriteLine(ex.Message);
+                    // .Result incapsula l'errore in AggregateException ("Si sono verificati uno o piu' errori"):
+                    // scrivo quello vero. TaskCanceledException qui significa timeout scaduto.
+                    var inner = (ex as AggregateException)?.GetBaseException() ?? ex;
+                    Console.WriteLine(cancel.IsCancellationRequested ? $"Annullata: {url}"
+                        : inner is TaskCanceledException ? $"Timeout ({client.Timeout.TotalSeconds:0} s) su {url}"
+                        : $"{inner.GetType().Name}: {inner.Message} su {url}");
                     return null;
                 }
             }

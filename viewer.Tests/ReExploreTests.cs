@@ -121,6 +121,47 @@ namespace viewer.Tests {
         // ---------- file salvati prima della correzione ----------
 
         [Test]
+        public void Load_CopiaVuotaDopoQuellaConLIndice_IndiceConservato() {
+            // Caso reale dei file vecchi: l'utente collega l'indice, poi una ri-esplorazione aggiunge
+            // in coda una copia vuota. "Vince l'ultima copia" perdeva l'indice (e il Save lo cancellava
+            // per sempre): per ogni dato vale l'ultimo valore non vuoto.
+            Tree.Bari();
+            Tree.AddAnno();
+            Tree.AddKind();
+            string f = Path.Combine(Sandbox.NewDir(), "r.json");
+            File.WriteAllText(f, @"[
+              {""description"":""unico"",""idSerie"":""282216"",""kind"":""Nati"",""anno"":""1813"",""idRegistro"":""282248"",""manifestId"":""wOgD6pM"",""idRegistroIndice"":""999"",""nPaginaIndice"":12,""lastPageViewed"":""50""},
+              {""description"":""unico"",""idSerie"":""282216"",""kind"":""Nati"",""anno"":""1813"",""idRegistro"":""282248"",""manifestId"":null,""idRegistroIndice"":null,""nPaginaIndice"":0,""lastPageViewed"":""70""}
+            ]");
+            Registro.Load(f);
+
+            var r = Registro.registroById["282248"];
+            Assert.That(r.idRegistroIndice, Is.EqualTo("999"));
+            Assert.That(r.nPaginaIndice, Is.EqualTo(12));
+            Assert.That(r.manifestId, Is.EqualTo("wOgD6pM"));
+            Assert.That(r.lastPageViewed, Is.EqualTo("70"), "qui la copia piu' recente ha un valore: vince lei");
+
+            // e il salvataggio non lo perde
+            Registro.Save(f);
+            Registro.registri.Clear(); Registro.registroById.Clear();
+            Registro.Load(f);
+            Assert.That(Registro.registroById["282248"].idRegistroIndice, Is.EqualTo("999"));
+        }
+
+        [Test]
+        public void Load_RegistroInDuePosizioni_RegistroByIdSullUltima() {
+            // come prima di bf1a42a: gotoRegister di un decennale seleziona l'ultima posizione del file
+            DueAnniDecennali();
+            string f = Path.Combine(Sandbox.NewDir(), "r.json");
+            File.WriteAllText(f, @"[
+              {""description"":""1876-1885"",""idSerie"":""282216"",""kind"":""Nati, indici decennali"",""anno"":""1876"",""idRegistro"":""877232""},
+              {""description"":""1876-1885"",""idSerie"":""282216"",""kind"":""Nati, indici decennali"",""anno"":""1885"",""idRegistro"":""877232""}
+            ]");
+            Registro.Load(f);
+            Assert.That(Registro.registroById["877232"].anno, Is.EqualTo("1885"));
+        }
+
+        [Test]
         public void Load_FileConCopie_DatiDallUltimaDescrizioneDallaPrima() {
             Tree.Bari();
             Tree.AddAnno();

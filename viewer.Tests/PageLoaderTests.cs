@@ -14,12 +14,17 @@ namespace viewer.Tests {
 
     /// <summary>
     /// Server HTTP/1.1 minimo su 127.0.0.1: una risposta per connessione, registra le richieste.
+    /// Con Concurrent = true serve le connessioni in parallelo (come un server vero) e misura in
+    /// MaxConcurrent quante ne ha avute aperte contemporaneamente.
     /// </summary>
     sealed class LocalHttpServer : IDisposable {
         readonly TcpListener listener;
         readonly CancellationTokenSource cts = new CancellationTokenSource();
         public readonly ConcurrentQueue<string> Requests = new ConcurrentQueue<string>();
         public Func<string, (string head, byte[] body)> Handler;
+        public bool Concurrent;
+        int active, maxConcurrent;
+        public int MaxConcurrent => Volatile.Read(ref maxConcurrent);
 
         public string BaseUrl { get; }
 
@@ -35,6 +40,19 @@ namespace viewer.Tests {
                 TcpClient c;
                 try { c = await listener.AcceptTcpClientAsync(); }
                 catch { return; }
+                if (Concurrent)
+                    _ = Task.Run(() => Serve(c));
+                else
+                    await Serve(c);
+            }
+        }
+
+        async Task Serve(TcpClient c) {
+            int now = Interlocked.Increment(ref active);
+            int seen;
+            while (now > (seen = Volatile.Read(ref maxConcurrent)) &&
+                   Interlocked.CompareExchange(ref maxConcurrent, now, seen) != seen) { }
+            try {
                 using (c)
                 using (var s = c.GetStream()) {
                     var sb = new StringBuilder();
@@ -49,6 +67,8 @@ namespace viewer.Tests {
                     await s.WriteAsync(body, 0, body.Length);
                 }
             }
+            catch { /* client che chiude a meta' (timeout): non deve fermare il server */ }
+            finally { Interlocked.Decrement(ref active); }
         }
 
         public void Dispose() {
@@ -154,6 +174,24 @@ namespace viewer.Tests {
             port = ((IPEndPoint)l.LocalEndpoint).Port;
             l.Stop();
             Assert.That(PageLoader.getResponseMessage($"http://127.0.0.1:{port}/"), Is.Null);
+        }
+
+        [Test]
+        public void Timeout_Passato_RispettatoERestituisceNull() {
+            server.Concurrent = true;
+            server.Handler = _ => { Thread.Sleep(3000); return Ok("tardi"); };
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var r = PageLoader.getResponseMessage(server.BaseUrl, timeout: TimeSpan.FromSeconds(1));
+            Assert.That(r, Is.Null);
+            Assert.That(sw.Elapsed.TotalSeconds, Is.LessThan(2.5), "deve arrendersi dopo ~1 s, non aspettare i 3 s del server");
+        }
+
+        [Test]
+        public void Timeout_NonPassato_RispostaLentaArriva() {
+            // senza timeout esplicito resta il default (100 s): una risposta da 2 s arriva
+            server.Handler = _ => { Thread.Sleep(2000); return Ok("lenta"); };
+            using (var r = PageLoader.getResponseMessage(server.BaseUrl))
+                Assert.That(r.Content.ReadAsStringAsync().Result, Is.EqualTo("lenta"));
         }
 
         [Test]

@@ -1800,7 +1800,6 @@ namespace viewer {
             this.txtDimensione.Name = "txtDimensione";
             this.txtDimensione.Size = new System.Drawing.Size(100, 23);
             this.txtDimensione.TabIndex = 50;
-            this.txtDimensione.TextChanged += new System.EventHandler(this.txtDimensione_TextChanged);
             // 
             // btRotRight
             // 

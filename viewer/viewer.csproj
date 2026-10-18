@@ -281,6 +281,8 @@
     <Compile Include="IArchiveNode.cs" />
     <Compile Include="Manifest.cs" />
     <Compile Include="PageLoader.cs" />
+    <Compile Include="PageLoadScheduler.cs" />
+    <Compile Include="InFlightDownloads.cs" />
     <Compile Include="RegNode.cs" />
     <Compile Include="SafeFile.cs" />
     <Compile Include="Viewer.cs">

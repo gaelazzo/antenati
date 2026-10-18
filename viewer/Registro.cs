@@ -94,26 +94,45 @@ namespace viewer {
             var all = JsonConvert.DeserializeObject<List<Registro>>(json);
 
             // I file salvati prima della correzione possono contenere piu' copie della stessa posizione
-            // (ogni ri-esplorazione ne aggiungeva una). Per i dati dell'utente vince l'ultima copia di
-            // ogni registro, come prima; per la descrizione la prima copia di ogni posizione, che e'
-            // quella mostrata nell'albero.
-            var latest = new Dictionary<string, Registro>();
+            // (ogni ri-esplorazione ne aggiungeva una, spesso vuota, in coda). Per ogni dato dell'utente
+            // vale l'ultimo valore NON vuoto fra le copie del registro: "vince l'ultima copia" faceva
+            // perdere l'indice collegato quando dopo c'era una copia vuota, e il Save successivo lo
+            // cancellava per sempre. Per la descrizione vale la prima copia di ogni posizione, che e'
+            // quella mostrata nell'albero; registroById punta all'ultima posizione, come prima.
+            var merged = new Dictionary<string, UserData>();
             foreach (Registro r in all) {
-                latest[r.idRegistro] = r;
+                if (!merged.TryGetValue(r.idRegistro, out UserData d))
+                    merged[r.idRegistro] = d = new UserData();
+                d.take(r);
             }
             registri = new List<Registro>();
             var positions = new HashSet<string>();
-            var loaded = new Dictionary<string, Registro>();
             foreach (Registro r in all) {
                 if (!positions.Add(r.idRegistro + "|" + r.parentKey))
                     continue;
-                r.copyUserData(latest[r.idRegistro]);
+                merged[r.idRegistro].applyTo(r);
                 registri.Add(r);
-                if (!loaded.ContainsKey(r.idRegistro))
-                    loaded[r.idRegistro] = r;
+                registroById[r.idRegistro] = r;
             }
-            foreach (var kv in loaded) {
-                registroById[kv.Key] = kv.Value;
+        }
+
+        /// <summary>Dati dell'utente di un registro, accumulati dalle sue copie in un file vecchio</summary>
+        class UserData {
+            string manifestId, idRegistroIndice, lastPageViewed;
+            int nPaginaIndice;
+
+            public void take(Registro r) {
+                if (!string.IsNullOrEmpty(r.manifestId)) manifestId = r.manifestId;
+                if (!string.IsNullOrEmpty(r.idRegistroIndice)) idRegistroIndice = r.idRegistroIndice;
+                if (r.nPaginaIndice != 0) nPaginaIndice = r.nPaginaIndice;
+                if (!string.IsNullOrEmpty(r.lastPageViewed)) lastPageViewed = r.lastPageViewed;
+            }
+
+            public void applyTo(Registro r) {
+                r.manifestId = manifestId;
+                r.idRegistroIndice = idRegistroIndice;
+                r.nPaginaIndice = nPaginaIndice;
+                r.lastPageViewed = lastPageViewed;
             }
         }
 
