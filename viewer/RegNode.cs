@@ -21,36 +21,43 @@ namespace viewer {
         public IArchiveNode archiveNode = null;
 
 
-        static DateTime ParseFirstDate(string caption) {
-            // Splitta la stringa sul carattere "-" per identificare la prima data
-            var parts = caption.Split('-');
-            string firstDate = parts[0];
-            if (parts.Length == 1) {
-                if (firstDate.Contains("/")) {
-                    // Singola data
-                    return DateTime.ParseExact(firstDate, "dd/MM/yyyy", CultureInfo.InvariantCulture);
-                }
-                return DateTime.ParseExact(firstDate, "yyyy", CultureInfo.InvariantCulture);
+        // Data (o anno) all'inizio del nome: "07/03/1840-30/04/1840", "7/3/1840", "1876-1885", "1840 bis"
+        static readonly System.Text.RegularExpressions.Regex leadingDate =
+            new System.Text.RegularExpressions.Regex(@"^\s*(?:(\d{1,2})/(\d{1,2})/(\d{4})|(\d{4}))(?!\d)");
 
-
+        /// <summary>Prima data del nome, null se il nome non comincia con una data</summary>
+        static DateTime? ParseFirstDate(string caption) {
+            var m = leadingDate.Match(caption ?? "");
+            if (!m.Success)
+                return null;
+            try {
+                if (m.Groups[4].Success)
+                    return new DateTime(int.Parse(m.Groups[4].Value), 1, 1);
+                return new DateTime(int.Parse(m.Groups[3].Value), int.Parse(m.Groups[2].Value), int.Parse(m.Groups[1].Value));
             }
-            else {
-                // Intervallo, prendi la prima data
-                if (firstDate.Contains("/")) {
-                    // Singola data
-                    return DateTime.ParseExact(firstDate, "dd/MM/yyyy", CultureInfo.InvariantCulture);
-                }
-                return DateTime.ParseExact(firstDate, "yyyy", CultureInfo.InvariantCulture);
+            catch (ArgumentOutOfRangeException) {
+                return null;   // es. 31/02/1840
             }
         }
 
-        static void rielaboraNomi(TreeNode parent) {
+        /// <summary>
+        /// "Riordina nomi": figli con un nome-data in ordine cronologico (prima data del nome); quelli
+        /// senza data dopo, in ordine alfabetico; a parita' resta l'ordine di prima. Prima un solo nome
+        /// non-data ("(A-I)", "10118, Parte 1", un nodo rinominato) mandava tutto in FormatException.
+        /// </summary>
+        public static void rielaboraNomi(TreeNode parent) {
             if (parent == null)
                 return;
             if (parent.Nodes.Count <= 1)
                 return;
             var allChildNodes = (from TreeNode n in parent.Nodes select n).ToList();
-            var ordereddNodes = allChildNodes.OrderBy(node => ParseFirstDate(node.Text)).ToList();
+            var ordereddNodes = allChildNodes
+                .Select(n => new { n, d = ParseFirstDate(n.Text) })
+                .OrderBy(x => x.d.HasValue ? 0 : 1)
+                .ThenBy(x => x.d ?? DateTime.MinValue)
+                .ThenBy(x => x.d.HasValue ? "" : x.n.Text, StringComparer.OrdinalIgnoreCase)
+                .Select(x => x.n)
+                .ToList();
             parent.Nodes.Clear();
             foreach (var n in ordereddNodes) {
                 parent.Nodes.Add(n);

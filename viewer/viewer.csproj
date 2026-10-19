@@ -283,6 +283,7 @@
     <Compile Include="PageLoader.cs" />
     <Compile Include="PageLoadScheduler.cs" />
     <Compile Include="InFlightDownloads.cs" />
+    <Compile Include="Precacher.cs" />
     <Compile Include="RegNode.cs" />
     <Compile Include="SafeFile.cs" />
     <Compile Include="Viewer.cs">

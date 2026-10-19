@@ -316,6 +316,73 @@ namespace viewer.Tests {
             Assert.That(LoadImage(code), Is.Not.Null);
         }
 
+        // ---------- precaricamento ----------
+
+        void PreparePrecache(int cacheSize = 5) {
+            Priv.Set(v, "standardStep", 1);
+            Priv.Set(v, "chkEnableKey", new System.Windows.Forms.CheckBox());
+            Priv.Set(v, "txtCacheSize", new System.Windows.Forms.TextBox { Text = cacheSize.ToString() });
+            Priv.Set(v, "precacher", new Precacher());
+        }
+
+        void SwitchRegister(string[] codes) {
+            var mapPage = new Dictionary<int, string>();
+            var pageDecode = new Dictionary<string, int>();
+            for (int i = 0; i < codes.Length; i++) { mapPage[i + 1] = codes[i]; pageDecode[codes[i]] = i + 1; }
+            Priv.Set(v, "mapPage", mapPage);
+            Priv.Set(v, "pageDecode", pageDecode);
+        }
+
+        [Test, CancelAfter(20000)]
+        public void Precache_CambioRegistro_IlNuovoParteSubito() {
+            // Doppio click su un altro registro mentre il precaricamento del precedente e' in corso:
+            // prima il nuovo non partiva ("isCaching") e con +1 le pagine arrivavano una ogni 20 s
+            var vecchio = Enumerable.Range(0, 30).Select(_ => NewCode()).ToArray();
+            var nuovo = Enumerable.Range(0, 30).Select(_ => NewCode()).ToArray();
+            PrepareRegister(vecchio);
+            PreparePrecache();
+            server.Concurrent = true;
+            server.Handler = _ => { Thread.Sleep(3000); return Image(Jpeg); };
+
+            Priv.Call(v, "startPrecache", 1, true);
+            WaitUntil(() => server.Requests.Count >= 1);
+
+            SwitchRegister(nuovo);
+            Priv.Call(v, "keepDownloadsNear", 1);
+            Priv.Call(v, "startPrecache", 2, true);
+
+            WaitUntil(() => server.Requests.Any(r => r.Contains(nuovo[1])), 1000);
+        }
+
+        [Test, CancelAfter(20000)]
+        public void Precache_TrePagineInParallelo() {
+            var codes = Enumerable.Range(0, 30).Select(_ => NewCode()).ToArray();
+            PrepareRegister(codes);
+            PreparePrecache(cacheSize: 6);
+            server.Concurrent = true;
+            server.Handler = _ => { Thread.Sleep(1000); return Image(Jpeg); };
+
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            Priv.Call(v, "startPrecache", 2, true);
+            WaitUntil(() => codes.Skip(1).Take(6).All(c => File.Exists(Path.Combine("data", Priv.Call<string>(v, "extendCode", c + ".jpg")))), 8000);
+
+            Assert.That(server.MaxConcurrent, Is.EqualTo(3));
+            Assert.That(sw.Elapsed.TotalSeconds, Is.LessThan(4), "6 pagine da 1 s a 3 per volta: ~2 s (una alla volta sarebbero 6)");
+        }
+
+        [Test]
+        public void UltimaPaginaVista_SalvataQuandoVaAVideo() {
+            PrepareRegister("a", "b", "c");
+            Priv.Call(v, "rememberPageShown", 3);
+            Assert.That(Registro.registroById["282248"].lastPageViewed, Is.EqualTo("3"));
+
+            string f = Path.Combine(Sandbox.NewDir(), "r.json");
+            Registro.Save(f);
+            Registro.registri.Clear(); Registro.registroById.Clear();
+            Registro.Load(f);
+            Assert.That(Registro.registroById["282248"].lastPageViewed, Is.EqualTo("3"), "riaperto col doppio click va li'");
+        }
+
         [Test, CancelAfter(15000)]
         public void RicaricaForzata_AnnullaIlDownloadInCorso() {
             string code = NewCode();

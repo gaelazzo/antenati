@@ -478,66 +478,37 @@ namespace viewer {
             forceReload(getNum());
         }
 
-        private int currPrecaching = 0;
-
-        async Task precache(int start, int num, bool forward) {
-            if (mapPage == null)
-                return;
-
-            lock (semaforo) {
-                if (isCaching)
-                    return;
-                isCaching = true;
-            }
-
-            try {
-                int curr = start;
-                int step = forward ? calcStep() : -calcStep();
-
-                for (int i = 0; i < num; i++) {
-                    if (stopCaching) {
-                        stopCaching = false;
-                        break;
-                    }
-                    if (!mapPage.ContainsKey(curr)) {
-                        break;
-                    }
-
-                    currPrecaching = curr;
-                    // IMPORTANTE: await. loadImage restituisce Task<string>: senza await il
-                    // confronto "== null" era sempre falso (un Task non e' mai null) e ogni
-                    // iterazione lanciava un download/decode full-res fire-and-forget -> esplosione
-                    // di richieste e memoria. Con await il precache torna sequenziale e limitato.
-                    if (await loadImage(mapPage[curr]) == null)
-                        break;
-                    curr += step;
-                }
-            }
-            finally {
-                currPrecaching = 0;
-                lock (semaforo) {
-                    isCaching = false;
-                }
-            }
-        }
+        // Precaricamento delle pagine successive: vedi Precacher (3 download insieme, un nuovo avvio
+        // sostituisce il precedente). Prima: una pagina alla volta, e se un precaricamento era in corso
+        // (es. del registro appena lasciato) quello nuovo non partiva.
+        Precacher precacher = new Precacher();
 
         private int cacheSize = 10;
 
         void startPrecache(int start, bool forward) {
-            if (isCaching)
+            var map = mapPage;
+            if (map == null)
                 return;
             cacheSize = 10;
             if (txtCacheSize.Text != "") {
                 int.TryParse(txtCacheSize.Text, out cacheSize);
             }
-
-            new Task(async () => {
-                try { await precache(start, cacheSize, forward); }
-                catch (Exception ex) { Console.WriteLine("precache error: " + ex.Message); }
-            }).Start();
+            int step = forward ? calcStep() : -calcStep();
+            if (step == 0)
+                step = forward ? 1 : -1;
+            var codes = new List<string>();
+            for (int i = 0, p = start; i < cacheSize && map.TryGetValue(p, out string c); i++, p += step)
+                codes.Add(c);
+            precacher.Start(codes, loadImage);
         }
 
-        private bool isCaching = false;
+        /// <summary>Numero della pagina che il precaricamento sta scaricando, 0 se fermo</summary>
+        int currPrecaching {
+            get {
+                string code = precacher.Current;
+                return code != null && pageDecode != null && pageDecode.TryGetValue(code, out int n) ? n : 0;
+            }
+        }
 
 
 
@@ -1075,7 +1046,7 @@ namespace viewer {
             btnMenoUno.Visible = false;
             btnFirst.Visible = false;
             btnLast.Visible = false;
-            stopCaching = true;
+            precacher.Stop();
         }
         void updateRotateRegister() {
             if (idRegistro == null) {
@@ -1139,7 +1110,7 @@ namespace viewer {
 
             updateCreaIndiceVisible();
 
-            btnStop.Visible = isCaching && !stopCaching;
+            btnStop.Visible = precacher.IsRunning;
             txtNEsplorazioni.Text = nExploring.ToString(); //richieste in corso
 
             labExplore.Text = currExploring;
@@ -1182,6 +1153,7 @@ namespace viewer {
                 imageToDisplay = null;
                 displayImage(pending);
                 nEffettivo = pendingNum;
+                rememberPageShown(pendingNum);
                 Console.WriteLine($"[{ora()}] Pagina {pendingNum} a video" +
                                   (mapPage.ContainsKey(pendingNum) ? $" ({mapPage[pendingNum]})" : ""));
                 if (toPushHistory) {
@@ -1517,10 +1489,8 @@ namespace viewer {
 
         HashSet<string> savedFiles = new HashSet<string>();
 
-        private bool stopCaching = false;
-
         private void btnStop_Click(object sender, EventArgs e) {
-            stopCaching = true;
+            precacher.Stop();
             btnStop.Visible = false;
         }
 
@@ -3075,40 +3045,10 @@ namespace viewer {
             return newNode;
         }
 
-        // Metodo per estrarre la prima data come DateTime
-        static DateTime ParseFirstDate(string caption) {
-            // Splitta la stringa sul carattere "-" per identificare la prima data
-            var parts = caption.Split('-');
-            string firstDate = parts[0];
-            if (parts.Length == 1) {
-                if (firstDate.Contains("/")) {
-                    // Singola data
-                    return DateTime.ParseExact(firstDate, "dd/MM/yyyy", CultureInfo.InvariantCulture);
-                }
-                return DateTime.ParseExact(firstDate, "yyyy", CultureInfo.InvariantCulture);
-
-
-            }
-            else {
-                // Intervallo, prendi la prima data
-                if (firstDate.Contains("/")) {
-                    // Singola data
-                    return DateTime.ParseExact(firstDate, "dd/MM/yyyy", CultureInfo.InvariantCulture);
-                }
-                return DateTime.ParseExact(firstDate, "yyyy", CultureInfo.InvariantCulture);
-            }
-        }
-
+        // Stessa regola di RegNode (prima qui c'era una copia di ParseFirstDate che andava in eccezione
+        // sui nomi non-data)
         void rielaboraNomi(TreeNode parent) {
-            if (parent == null)
-                return;
-            var allChildNodes = (from TreeNode n in parent.Nodes select n).ToList();
-            var ordereddNodes = allChildNodes.OrderBy(node => ParseFirstDate(node.Text)).ToList();
-            parent.Nodes.Clear();
-            foreach (var n in ordereddNodes) {
-                parent.Nodes.Add(n);
-            }
-
+            RegNode.rielaboraNomi(parent);
         }
 
         private void rielaboraNomiToolStripMenuItem_Click(object sender, EventArgs e) {
@@ -3574,6 +3514,16 @@ namespace viewer {
 
         private void upsideDownToolStripMenuItem_Click(object sender, EventArgs e) {
 
+        }
+
+        /// <summary>
+        /// Ultima pagina vista del registro, riaperta col doppio click (setRegister). Si salva quando la
+        /// pagina va davvero a video: prima solo uscendo dal nodo e se la pagina era gia' arrivata,
+        /// quindi cambiando registro mentre la pagina caricava non restava traccia.
+        /// </summary>
+        void rememberPageShown(int page) {
+            if (page > 0 && idRegistro != null && Registro.registroById.TryGetValue(idRegistro, out Registro r))
+                r.lastPageViewed = page.ToString();
         }
 
         void GetAppuntiNodo() {

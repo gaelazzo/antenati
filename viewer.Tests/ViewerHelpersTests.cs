@@ -100,10 +100,12 @@ namespace viewer.Tests {
         }
 
         [Test]
-        public void ParseFirstDate_UgualeAQuellaDelTree() {
-            foreach (var s in new[] { "1813", "1809-1810", "05/04/1820" })
-                Assert.That(Priv.Call<DateTime>(typeof(Viewer), "ParseFirstDate", s),
-                            Is.EqualTo(Priv.Call<DateTime>(typeof(RegNode), "ParseFirstDate", s)));
+        public void ParseFirstDate_UnaSolaCopia_QuellaDelTree() {
+            // c'erano due copie (Viewer e RegNode) da tenere allineate; ora "Riordina nomi" del Viewer
+            // chiama RegNode.rielaboraNomi (vedi RiordinaNomiTests.ViewerUsaLaStessaRegola)
+            var all = System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public;
+            Assert.That(typeof(Viewer).GetMethod("ParseFirstDate", all), Is.Null);
+            Assert.That(typeof(RegNode).GetMethod("ParseFirstDate", all), Is.Not.Null);
         }
 
         // ---------- Nomi e cognomi (ricerca GEDCOM) ----------
