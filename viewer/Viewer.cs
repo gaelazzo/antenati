@@ -42,10 +42,7 @@ namespace viewer {
         // dopo qualche tentativo (vedi timer1_Tick), NON a blacklistare la pagina in modo permanente.
         // Un successo azzera il contatore (loadImage), quindi ri-navigando si ritenta sempre.
         Dictionary<string, int> failCount = new Dictionary<string, int>();
-        int BASE_WIDTH = 1200;
-		int BASE_HEIGTH = 1200;
 
-		int currImageWidth = 1000;
         string extendCode(string code) {
             return  Regex.Replace(code, "([A-Z])", "_$1");
         }
@@ -95,15 +92,6 @@ namespace viewer {
             //return $"https://iiif-antenati.cultura.gov.it/iiif/2/{code}/full/{width},/0/default.jpg";
 
         }
-
-        class noteToAdd {
-            public System.Windows.Forms.TreeNodeCollection collection=null;
-            public System.Windows.Forms.TreeNode n = null;
-            public string filename = null;
-            public bool autoexplore=false;
-            public bool toGo = false;
-        }
-
 
         void fillComboArchivi() {
             var rr = Archivio.archivi;
@@ -388,84 +376,13 @@ namespace viewer {
         private System.Drawing.Image lastImage = null;
 
         private Dictionary<int, string> mapPage = new Dictionary<int, string>();
-        private Dictionary<string, int> mapWidth = new Dictionary<string, int>();
 		private Dictionary<string, int> pageDecode = new Dictionary<string, int>();
-
-        void clearMaps() {
-            mapPage.Clear();
-            pageDecode.Clear();
-            mapWidth.Clear();
-            lock (hashSemaphore) { failCount.Clear(); }
-		}
-
-
 
         //https://antenati.cultura.gov.it/ark:/[appCode]/an_ua[registro]/[codepage]
 
-
         Manifest currManifest = null;
-        //Manifest indexManifest = null;
-
-
-
-
 
         string idRegistro = null;
-        //string archivio = "";
-        //string registerName = "";
-        //string Comune = "";
-        //string Anno = "";
-        //string tipologia = "";
-
-
-        string pageCode = "";
-        int pageNumber = 0;
-
-        /// <summary>
-        /// Legge i dati e la codifica da un url
-        /// </summary>
-        /// <param name="url"></param>
-        /// <returns></returns>
-        public async Task<string> loadPage(string url) {
-            string manifestId = ManifestIdExtractor.ExtractManifestId(url);
-
-            var manifest = await Manifest.LoadManifest(manifestId);
-            var uri = new Uri(url);
-            var segments = uri.Segments;
-            if (segments.Length > 4) { // Il segmento aggiuntivo è presente
-                string lastSegment = segments[segments.Length - 1]; // Ottieni l'ultimo segmento
-                return await setPageByCode(lastSegment);
-            }
-            else { // L'URL termina senza il segmento aggiuntivo
-                return await setPageByNumber(1);
-            }
-        }
-
-
-        async Task<string> setPageByCode(string code) {
-            if (pageDecode.ContainsKey(code)) {
-                pageCode = code;
-                pageNumber = pageDecode[pageCode];
-                return await loadJpg(pageCode);
-            }
-            return pageCode;
-        }
-
-        async Task<string> setPageByNumber(int nPage) {
-
-            if (mapPage.ContainsKey(nPage)) {
-                pageNumber = nPage;
-                pageCode = mapPage[pageNumber];
-                return await loadJpg(pageCode);
-            }
-            return null;
-        }
-
-        async Task<string> loadJpg(string code) {
-			// loadImage vuole il codice immagine, non l'URL: l'URL lo costruisce queueDownloadFile.
-			return await loadImage(code);
-
-        }
 
         /// <summary>
         /// Azzera la current image facendo in modo che il prossimo da visitare sia quello nel txt
@@ -701,31 +618,6 @@ namespace viewer {
 
         int xScroll = 0;
         int yScroll = 0;
-        int lastImageWidth = 0;
-		int lastImageHeigth = 0;
-        
-        /*
-        bool isZoomAllowed(int zoom) {
-			var zoomFactor = Convert.ToDouble(zoom) / 1000.0;
-
-			Size newSize = new Size((int)(Math.Round(Convert.ToDouble(BASE_WIDTH * zoomFactor))),
-					(int)(Math.Round(Convert.ToDouble(BASE_HEIGTH * zoomFactor))));
-
-            if (newSize.Width < 100) {
-                return false;
-			}
-			if (newSize.Width > 4000) {
-				return false;
-			}
-            return true;
-		}
-		void recalculateCurrentImageWidth(int zoom) {
-			var zoomFactor = Convert.ToDouble(zoom) / 1000.0;
-			currImageWidth = (int)Math.Round(BASE_WIDTH * zoomFactor);
-            deleteCache();            
-		}
-
-        */
 
 		int prevWidth = 0;
 		int prevHeight = 0;
@@ -740,8 +632,6 @@ namespace viewer {
             return Math.Min(zoomX, zoomY);
         }
 
-        Image baseImage;   // originale da disco
-        Image renderImage; // zoomata
 
         void displayImage(Image imgBase) {
             if (drawing) {
@@ -882,7 +772,6 @@ namespace viewer {
             currManifest = null;
             pageDecode = new Dictionary<string, int>();
             mapPage = new Dictionary<int, string>();
-            mapWidth = new Dictionary<string, int>();
             lock (hashSemaphore) { failCount.Clear(); }
 		}
         void setTotPages() {
@@ -933,7 +822,6 @@ namespace viewer {
             currManifest = r.manifest;
             pageDecode = currManifest.pageDecode;
             mapPage = currManifest.mapPage;
-            mapWidth = currManifest.pageWidth;
 
 			setTotPages();
 
@@ -1525,28 +1413,6 @@ namespace viewer {
 
         private int standardStep = 1;
 
-
-
-        //public void queueDownloadFile(string url, string filename) {
-        //    if (checkFileRequestExists(filename)) return;
-        //    WebClient w = null;
-        //    try {
-        //        addRequest(filename);
-        //        Sdownload.WaitOne();
-        //        w = new WebClient();
-        //        w.DownloadFile(url, filename);
-        //    }
-        //    catch {
-        //    }
-        //    finally {
-        //        Sdownload.Release();
-        //        w?.Dispose();
-        //        removeRequest(filename);
-        //    }
-
-        //}
-
-
         static string ora() => DateTime.Now.ToString("HH:mm:ss.fff");
 
         // Segnali acustici del programma. Spenti solo dai test (Sandbox), che altrimenti suonano a ogni
@@ -1566,7 +1432,6 @@ namespace viewer {
 
         /// <param name="cancel">annulla l'attesa del semaforo, la richiesta e la copia (pagina lasciata, Go)</param>
         public async Task<bool> queueDownloadFile(string code,  string path, bool forced, CancellationToken cancel) {
-            WebClient w = null;
             bool acquired = false;
             string folder = Path.GetDirectoryName(path);
             if (!Directory.Exists(folder)) {
@@ -1706,41 +1571,12 @@ namespace viewer {
             finally {
                 if (acquired)
                     Sdownload.Release();
-                w?.Dispose();
                 // il file temporaneo resta se si esce prima della fine (annullamento, errore, dimensione errata)
                 try { if (File.Exists(fileName)) File.Delete(fileName); } catch { }
             }
 
             return false;
         }
-
-        /// <summary>
-        /// Scarica la risorsa indicata da un url
-        /// </summary>
-        /// <param name="url"></param>
-        /// <param name="forced">Se forced è true ammette il download bypassando i semafori</param>
-        /// <returns></returns>
-        public string queueDownloadString(string url, bool forced = true) {
-            string s = null;
-            WebClient w = null;
-            try {
-                if (!forced)
-                    Sdownload.WaitOne();
-                w = new WebClient();
-                currExploring = url;
-                s = w.DownloadString(url);
-            }
-            catch {
-            }
-            finally {
-                if (!forced)
-                    Sdownload.Release();
-                w?.Dispose();
-            }
-
-            return s;
-        }
-
 
         void writeStartValues() {
             StringBuilder s = new StringBuilder();
@@ -2198,11 +2034,6 @@ namespace viewer {
 
 
 
-
-        Dictionary<string, bool> previouslyAdded = new Dictionary<string, bool>();
-
-
-
         private void Form1_FormClosing(object sender, FormClosingEventArgs e) {
             saveNotes();
             writeStartValues();
@@ -2482,10 +2313,6 @@ namespace viewer {
         }
 
 
-
-        string getAddress() {
-            return txtAddress.Text.Trim();
-        }
 
 
 
@@ -2863,49 +2690,6 @@ namespace viewer {
         }
 
 
-        /*
-        private void btnIntegraIndice_Click(object sender, EventArgs e) {
-            btnIntegraIndice.Visible = false;
-            Dictionary<string, int> unindexed = new Dictionary<string, int>();
-            StringBuilder s = new StringBuilder();
-            saveNodes(s);
-            StringReader sr = new StringReader(s.ToString());
-
-            while (sr.Peek() > -1) {
-                string line = sr.ReadLine().Trim();
-                if (string.IsNullOrEmpty(line)) return;
-
-                List<string> parts = line.Split('/').ToList();
-                if (parts.Count < 4) continue;
-                int indexValue;
-                if (int.TryParse(parts.Last(), out indexValue)) {
-                    parts.RemoveAt(parts.Count - 1);
-                    string unindexedKey;
-                    //if (unindexedKey.EndsWith("/")) unindexedKey.Remove(unindexedKey.Length - 1);
-                    if (parts.Count < 4) continue;
-                    if (parts[3].EndsWith("+indice")) {
-                        parts[3] = parts[3].Substring(0, parts[3].Length - 7);
-                        unindexedKey = string.Join("/", parts);
-                        if (unindexed.ContainsKey(unindexedKey)) {
-                            if (!index.ContainsKey(unindexed[unindexedKey])) {
-                                index[unindexed[unindexedKey]] = indexValue;
-                            }
-
-                        }
-                    }
-                    else {
-                        if (parts.Count < 4) continue;
-                        if (parts.Count > 5) parts.RemoveAt(parts.Count - 1);
-                        unindexedKey = string.Join("/", parts);
-                        unindexed[unindexedKey] = indexValue;
-                    }
-                }
-            }
-
-            btnIntegraIndice.Visible = true;
-
-        }
-        */
 
         string getIdRegister(TreeNode node) {
             var rn = node?.Tag as RegNode;
@@ -2940,15 +2724,6 @@ namespace viewer {
         }
         public int toIntOrDefault(string input, int valore = 1) {
             return int.TryParse(input, out int result) ? result : valore;
-        }
-
-        private void btnViewIndex2_Click(object sender, EventArgs e) {
-            pushHistory(getMark());
-            var indexReg = getCurrIndexRegister();
-            if (indexReg != null) {
-                var nPagina = indexReg.nPaginaIndice;
-                goToNumber(nPagina);
-            }
         }
 
         private void txtAddress_DoubleClick(object sender, EventArgs e) {
@@ -3418,18 +3193,6 @@ namespace viewer {
             bmp.UnlockBits(bitmapdata);
         }
 
-        private void btnContrasta_Click(object sender, EventArgs e) {
-            var bmp = pic.Image;
-            processImage((Bitmap)bmp, contrastBar.Value);
-            pic.Refresh();
-        }
-
-        void reloadImage() {
-            int n = getNum();
-            // Load image asynchronously to avoid blocking UI thread during zoom changes
-            _ = viewImage(n, chkContrast.Checked, contrastBar.Value);
-        }
-
 		/// <summary>
 		/// Carica e visualizza l'immagine n-esima con la dimensione corrente
 		/// </summary>
@@ -3526,52 +3289,6 @@ namespace viewer {
             return true;
         }
 
-        class TinyUrlResponse {
-            public string original_url { get; set; }
-            public string shortened_url { get; set; }
-            public string created_at { get; set; }
-        }
-
-        // tiny url api token 
-
-        protected async Task<T> ShortenUrl_Command<T>(string commandUrl, Dictionary<string, string> parameters = null, HttpMethod httpMethod = null) {
-            commandUrl = " https://tinyurl.com/" + commandUrl;
-            if (httpMethod == null) {
-                httpMethod = HttpMethod.Get;
-            }
-
-            if (parameters != null && httpMethod == HttpMethod.Get) {
-                StringBuilder parms = new StringBuilder();
-                parms.Append("?");
-                int itemCount = 0;
-                foreach (KeyValuePair<string, string> item in parameters) {
-                    parms.Append(item.Key);
-                    parms.Append("=");
-                    parms.Append(WebUtility.UrlEncode(item.Value));
-                    itemCount++;
-                    if (itemCount != parameters.Count) {
-                        parms.Append("&");
-                    }
-                }
-
-                commandUrl += parms;
-            }
-
-            HttpRequestMessage request = new HttpRequestMessage(httpMethod, commandUrl);
-            if (parameters != null && httpMethod != HttpMethod.Get) {
-                request.Content = new StringContent(JsonConvert.SerializeObject(parameters), Encoding.UTF8, "application/json");
-            }
-
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tinyUrlCode);
-            HttpClient httpClient = new HttpClient();
-            HttpResponseMessage res = await httpClient.SendAsync(request).ConfigureAwait(continueOnCapturedContext: false);
-            res.EnsureSuccessStatusCode();
-            var result = JsonConvert.DeserializeObject<T>(await res.Content.ReadAsStringAsync().ConfigureAwait(continueOnCapturedContext: false));
-            request.Dispose();
-            res.Dispose();
-            return result;
-        }
-
         async Task<string> ShortenUrl(string longUrl) {
             var bitly = new Bitly(bitlyCode);
             var linkResponse = await bitly.PostShorten(longUrl);
@@ -3608,10 +3325,6 @@ namespace viewer {
         }
 
         private void contextMenuStrip1_Opening(object sender, CancelEventArgs e) {
-
-        }
-
-        private void upsideDownToolStripMenuItem_Click(object sender, EventArgs e) {
 
         }
 
@@ -4201,22 +3914,6 @@ namespace viewer {
                 toPushHistory = moved;
             }
         }
-        private void annoPrecedenteToolStripMenuItem_Click(object sender, EventArgs e) {
-            addDeltaAnnoToCurrent(-1);
-        }
-
-        private void annoSuccessivoToolStripMenuItem_Click(object sender, EventArgs e) {
-            addDeltaAnnoToCurrent(1);
-        }
-
-        private void annoSuccessivoToolStripMenuItem1_Click(object sender, EventArgs e) {
-            addDeltaAnnoToCurrent(1);
-        }
-
-        private void annoPrecedenteToolStripMenuItem1_Click(object sender, EventArgs e) {
-            addDeltaAnnoToCurrent(-1);
-        }
-
         private void btnAnnoPrima_Click(object sender, EventArgs e) {
             addDeltaAnnoToCurrent(-1);
         }
@@ -4941,45 +4638,6 @@ namespace viewer {
 
 
 
-    public class RegistryExtractor {
-        private static readonly HttpClient client = new HttpClient();
-
-        public static async Task ExtractRegistryInfo(string url) {
-            var html = await client.GetStringAsync(url);
-            var doc = new HtmlAgilityPack.HtmlDocument();
-            doc.LoadHtml(html);
-
-            var detailRegistryNode = doc.DocumentNode.SelectSingleNode("//div[contains(@class, 'detail-registry')]");
-
-            if (detailRegistryNode != null) {
-                // Estrai nome archivio
-                var archiveNode = detailRegistryNode.SelectSingleNode("//p[strong[contains(text(), 'Conservato da:')]]/a");
-                string archiveName = archiveNode?.InnerText.Trim();
-
-                // Estrai tipo registro
-                var typeNode = detailRegistryNode.SelectSingleNode("//div/p/a/strong");
-                string type = typeNode?.InnerText.Trim();
-
-                // Estrai nome registro
-                var registryNode = detailRegistryNode.SelectSingleNode("//p/a[contains(@href, 'descrizione=Stato')]");
-                string registryName = registryNode?.InnerText.Trim();
-
-                // Estrai comune/località
-                var locationNode = detailRegistryNode.SelectSingleNode("//p[strong[contains(text(), 'Comune/Località:')]]/a");
-                string location = locationNode?.InnerText.Trim();
-
-                // Anno (ti anticipo dove lo cerchiamo: verifica se è in fondo alla pagina o vicino all’elemento "Copialink del bookmark")
-                var yearNode = detailRegistryNode.SelectSingleNode("//aside[contains(@class, 'gap-pv')]//text()[contains(., '1816')]");
-                string year = yearNode?.InnerText.Trim();
-
-                Console.WriteLine($"Archivio: {archiveName}");
-                Console.WriteLine($"Tipo: {type}");
-                Console.WriteLine($"Registro: {registryName}");
-                Console.WriteLine($"Comune/Località: {location}");
-                Console.WriteLine($"Anno: {year}");
-            }
-        }
-    }
 
 
 }

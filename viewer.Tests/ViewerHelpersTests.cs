@@ -270,7 +270,6 @@ namespace viewer.Tests {
         [TestCase("")]
         public void SetRegister_Vuoto_VistaVuota(string id) {
             PrepareSetRegister();
-            Priv.Set(v, "mapWidth", new Dictionary<string, int>());
             Priv.Call(v, "setRegister", id);
             Assert.That(Priv.Get(v, "idRegistro"), Is.Null);
             Assert.That((Dictionary<int, string>)Priv.Get(v, "mapPage"), Is.Empty);
