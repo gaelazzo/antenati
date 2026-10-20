@@ -112,6 +112,14 @@ namespace viewer.Tests {
         readonly ConcurrentDictionary<string, int> delayMs = new ConcurrentDictionary<string, int>();
         readonly ConcurrentDictionary<string, int> status = new ConcurrentDictionary<string, int>();
 
+        /// <summary>
+        /// Fine del test: le richieste ancora in ritardo rispondono subito con un errore. Senza, un download
+        /// lento lasciato dal test finiva dopo e il Viewer chiuso salvava l'immagine in data\ relativo alla
+        /// cartella corrente, cioe' nella sandbox del test successivo, dove la pagina risultava gia' in cache
+        /// (PiuUno_IlPrecaricamentoSiSpostaConIlLettore falliva cosi', a seconda di quali test lo precedevano)
+        /// </summary>
+        ManualResetEventSlim ending;
+
         static readonly byte[] Jpeg = MakeJpeg();
         static byte[] MakeJpeg() {
             var rnd = new Random(7);
@@ -130,6 +138,7 @@ namespace viewer.Tests {
 
         [SetUp]
         public void SetUp() {
+            var end = ending = new ManualResetEventSlim(false);   // di questo test: il server lo cattura
             savedDir = Environment.CurrentDirectory;
             Environment.CurrentDirectory = Sandbox.NewDir();      // start.txt, note, data\, manifest\ di questo scenario
             File.WriteAllText(Archivio.archiveName, "[]");
@@ -154,7 +163,9 @@ namespace viewer.Tests {
                 var m = Regex.Match(path, @"/iiif/2/(\w+)/");
                 if (!m.Success) return ("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n", Encoding.ASCII.GetBytes("home"));
                 string code = m.Groups[1].Value;
-                if (delayMs.TryGetValue(code, out int d)) Thread.Sleep(d);
+                if (delayMs.TryGetValue(code, out int d)) end.Wait(d);
+                if (end.IsSet)
+                    return ("HTTP/1.1 503 Fine del test\r\nContent-Type: text/html\r\n", Encoding.ASCII.GetBytes("<html>fine</html>"));
                 if (status.TryGetValue(code, out int st) && st != 200)
                     return ($"HTTP/1.1 {st} Errore\r\nContent-Type: text/html\r\n", Encoding.ASCII.GetBytes("<html>errore</html>"));
                 return ("HTTP/1.1 200 OK\r\nContent-Type: image/jpeg\r\n", Jpeg);
@@ -170,6 +181,7 @@ namespace viewer.Tests {
 
         [TearDown]
         public void TearDown() {
+            ending.Set();
             host?.Dispose(); host = null;
             Console.SetOut(savedOut);
             Viewer.iiifBaseUrl = savedIiif;
