@@ -22,7 +22,7 @@ namespace viewer {
         public class Options {
             public string SiteUrl = "https://antenati.cultura.gov.it/";
             public string ManifestUrl;
-            public string IiifBase = Viewer.iiifBaseUrl;
+            public IiifServer Iiif = IiifServer.current;
             /// <summary>larghezza richiesta dal programma (0 = full/max)</summary>
             public int Width;
             /// <summary>codice di un'immagine gia' vista (pagina corrente), null per saltare</summary>
@@ -51,22 +51,6 @@ namespace viewer {
             public string Text;
         }
 
-        /// <summary>
-        /// Regioni IIIF dei tasselli come le chiede il visualizzatore del sito: tasselli di tile px
-        /// all'uscita, a fattore di scala scale (es. 3789x2784, 1024, 2 -> "0,0,2048,2048/1024," ...)
-        /// </summary>
-        public static string[] TileRegions(int width, int height, int tile, int scale) {
-            var res = new List<string>();
-            int span = tile * scale;
-            for (int y = 0; y < height; y += span)
-                for (int x = 0; x < width; x += span) {
-                    int w = Math.Min(span, width - x), h = Math.Min(span, height - y);
-                    int outW = (w + scale - 1) / scale;
-                    res.Add($"{x},{y},{w},{h}/{outW},");
-                }
-            return res.ToArray();
-        }
-
         static Step Get(string name, string url, Options o, bool readBody, out string body) {
             body = null;
             var headers = new Dictionary<string, string> {
@@ -85,19 +69,15 @@ namespace viewer {
 
         static Step Get(string name, string url, Options o) => Get(name, url, o, false, out _);
 
-        static string Size(Options o) => o.Width > 0 ? o.Width + "," : "max";
-
         /// <summary>Pagina come la scarica il visualizzatore del sito: info.json poi i tasselli in parallelo</summary>
         static Step SiteLike(string code, Options o) {
             var sw = Stopwatch.StartNew();
-            var info = Get("info", o.IiifBase + code + "/info.json", o, true, out string json);
+            var info = Get("info", o.Iiif.infoUrl(code), o, true, out string json);
             if (!info.Ok || json == null)
                 return new Step { Name = "Pagina nuova (tasselli, come il sito)", Ms = sw.ElapsedMilliseconds, Status = info.Status, Detail = "info.json non disponibile" };
-            var j = JObject.Parse(json);
-            int w = (int)j["width"], h = (int)j["height"];
-            int tile = (int?)j["tiles"]?[0]?["width"] ?? 1024;
-            var regions = TileRegions(w, h, tile, 2);
-            var tiles = regions.Select(rg => Task.Factory.StartNew(() => Get("tassello", o.IiifBase + code + "/" + rg + "/0/default.jpg", o),
+            var i = IiifServer.parseInfo(json);
+            var regions = IiifServer.tileRegions(i.width, i.height, i.tileWidth, 2);
+            var tiles = regions.Select(rg => Task.Factory.StartNew(() => Get("tassello", o.Iiif.tileUrl(code, rg), o),
                                                                   TaskCreationOptions.LongRunning)).ToArray();
             Task.WaitAll(tiles);
             var bad = tiles.Select(t => t.Result).FirstOrDefault(s => !s.Ok);
@@ -118,13 +98,13 @@ namespace viewer {
                 rep.Steps.Add(Get("Manifest del registro", o.ManifestUrl, o));
             Step viewed = null, programma = null, sito = null;
             if (o.ViewedCode != null) {
-                viewed = Get("Immagine gia' vista", o.IiifBase + o.ViewedCode + "/full/" + Size(o) + "/0/default.jpg", o);
+                viewed = Get("Immagine gia' vista", o.Iiif.imageUrl(o.ViewedCode, o.Width), o);
                 rep.Steps.Add(viewed);
             }
             var cold = o.ColdCodes ?? new string[0];
             if (cold.Length > 0) {
                 // nello stesso momento, cosi' il confronto non dipende dagli sbalzi del server
-                var tA = Task.Factory.StartNew(() => Get("Pagina nuova (modo del programma)", o.IiifBase + cold[0] + "/full/" + Size(o) + "/0/default.jpg", o),
+                var tA = Task.Factory.StartNew(() => Get("Pagina nuova (modo del programma)", o.Iiif.imageUrl(cold[0], o.Width), o),
                                                TaskCreationOptions.LongRunning);
                 var tB = cold.Length > 1 ? Task.Factory.StartNew(() => SiteLike(cold[1], o), TaskCreationOptions.LongRunning) : null;
                 programma = tA.Result;

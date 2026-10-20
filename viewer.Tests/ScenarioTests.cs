@@ -98,7 +98,8 @@ namespace viewer.Tests {
     [TestFixture, NonParallelizable, CancelAfter(90000)]
     public class ScenarioTests {
         LocalHttpServer server;
-        string savedIiif, savedWarm, savedDir;
+        IiifServer savedIiif;
+        string savedWarm, savedDir;
         StringWriter log;
         TextWriter syncLog, savedOut;
 
@@ -170,7 +171,7 @@ namespace viewer.Tests {
                     return ($"HTTP/1.1 {st} Errore\r\nContent-Type: text/html\r\n", Encoding.ASCII.GetBytes("<html>errore</html>"));
                 return ("HTTP/1.1 200 OK\r\nContent-Type: image/jpeg\r\n", Jpeg);
             };
-            savedIiif = Viewer.iiifBaseUrl; Viewer.iiifBaseUrl = server.BaseUrl + "iiif/2/";
+            savedIiif = IiifServer.current; IiifServer.current = new IiifServer(server.BaseUrl + "iiif/2/");
             savedWarm = PageLoader.warmUpUrl; PageLoader.warmUpUrl = server.BaseUrl;
 
             savedOut = Console.Out;
@@ -184,7 +185,7 @@ namespace viewer.Tests {
             ending.Set();
             host?.Dispose(); host = null;
             Console.SetOut(savedOut);
-            Viewer.iiifBaseUrl = savedIiif;
+            IiifServer.current = savedIiif;
             PageLoader.warmUpUrl = savedWarm;
             server.Dispose();
             Environment.CurrentDirectory = savedDir;
@@ -332,6 +333,27 @@ namespace viewer.Tests {
                 catch (Exception e) { err = e; }
             });
             Assert.That(err, Is.Null, "vai all'indice senza registro corrente: " + err);
+        }
+
+        void Decode(string url) => host.Do(() => {
+            ((TextBox)Priv.Get(host.V, "txtUrlToDecode")).Text = url;
+            Priv.Call(host.V, "decodeUrl");
+        });
+
+        [Test]
+        public void DecodificaIndirizzoDellaPagina_ApreRegistroEPagina() {
+            Start(R1, 1);
+            host.WaitUntil(() => host.Shown == 1, 10000, "R1 pagina 1");
+            Decode($"vedi https://antenati.cultura.gov.it/ark:/12657/an_ua{R2}/{Code(R2, 5)} qui");
+            host.WaitUntil(() => host.Get(() => (string)Priv.Get(host.V, "idRegistro")) == R2 && host.Shown == 5, 10000, "R2 pagina 5");
+        }
+
+        [Test]
+        public void DecodificaIndirizzoDellImmagine_TrovaIlRegistroDallaPagina() {
+            Start(R1, 1);
+            host.WaitUntil(() => host.Shown == 1, 10000, "R1 pagina 1");
+            Decode(server.BaseUrl + "iiif/2/" + Code(R2, 7) + "/full/full/0/default.jpg");
+            host.WaitUntil(() => host.Get(() => (string)Priv.Get(host.V, "idRegistro")) == R2 && host.Shown == 7, 10000, "R2 pagina 7");
         }
 
         [Test]

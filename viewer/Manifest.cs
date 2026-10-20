@@ -308,11 +308,7 @@ namespace viewer {
 			}
 		}
 		public static async Task<IiifInfo> LoadInfoJsonAsync(string idImage) {
-			// Costruisce l'URL del manifest del registro  
-			string url = $"https://iiif-antenati.cultura.gov.it/iiif/2/{idImage}/info.json";
-
-
-			//https://dam-antenati.cultura.gov.it/antenati/containers/wrrkrG8/manifest
+			string url = IiifServer.current.infoUrl(idImage);
 
 			try {
 				PageLoader.WaitWarmUp();
@@ -350,12 +346,11 @@ namespace viewer {
 				// Legge il contenuto della risposta come stringa
 				string jsonContent = await response.Content.ReadAsStringAsync();
 
-				// Converte la stringa JSON in un oggetto JObject
-				JObject registroJson = JObject.Parse(jsonContent);
+				var info = IiifServer.parseInfo(jsonContent);
 				return new IiifInfo() {
 					idImage= idImage,
-                    width= registroJson["width"]?.Value<int>() ?? 0,
-                    height= registroJson["height"]?.Value<int>() ?? 0
+                    width= info.width,
+                    height= info.height
 				};
 			}
 			catch (HttpRequestException e) {

@@ -78,17 +78,8 @@ namespace viewer {
                     Console.WriteLine($"Codice {code} fallito {n} volte: stop al retry automatico (ri-naviga per ritentare).");
             }
         }
-        // Base del server IIIF delle immagini (modificabile solo dai test, per puntare a un server locale)
-        public static string iiifBaseUrl = "https://iiif-antenati.cultura.gov.it/iiif/2/";
-
         string getImageUrlByCode(string code, bool useMax = false) {
-			// {scheme}://{server}/iiif/2/{identifier}/{region}/{size}/{rotation}/{quality}.{format}
-            if (useMax || dimension == 0) return iiifBaseUrl + code + "/full/max/0/default.jpg";
-            return $"{iiifBaseUrl}{code}/full/{dimension},/0/default.jpg";
-            // https://iiif-antenati.cultura.gov.it/iiif/2/5VrBEzV/0,2048,1024,518/1024,/0/default.jpg
-
-            //return $"https://iiif-antenati.cultura.gov.it/iiif/2/{code}/full/{width},/0/default.jpg";
-
+            return IiifServer.current.imageUrl(code, useMax ? 0 : dimension);
         }
 
         void fillComboArchivi() {
@@ -194,7 +185,7 @@ namespace viewer {
             try {
                 await webView.EnsureCoreWebView2Async();
                 webView.CoreWebView2.AddWebResourceRequestedFilter(
-                    "https://iiif-antenati.cultura.gov.it/*",
+                    IiifServer.current.requestFilter,
                     Microsoft.Web.WebView2.Core.CoreWebView2WebResourceContext.All);
                 webView.CoreWebView2.WebResourceRequested += (s, ev) => {
                     ev.Request.Headers.SetHeader("Referer", "https://antenati.cultura.gov.it");
@@ -3639,10 +3630,8 @@ namespace viewer {
                 }
             }
 
-            if (url.StartsWith("https://iiif-antenati.cultura.gov.it/iiif")) {
-                // https://iiif-antenati.cultura.gov.it/iiif/2/wOxV6Vr/full/full/0/default.jpg
-                var parts = url.Split('/');
-                string imgCode = parts[5].Trim();
+            string imgCode = IiifServer.current.codeFromImageUrl(url);
+            if (imgCode != null) {
                 //Cerca il manifest tra tutti i registri
                 foreach (var reg in Registro.registroById.Values) {
                     var idMan = reg.manifestId;

@@ -20,15 +20,16 @@ namespace viewer.Tests {
     public class DownloadTests {
         LocalHttpServer server;
         Viewer v;
-        string savedIiif, savedDam;
+        IiifServer savedIiif;
+        string savedDam;
 
         [SetUp]
         public void SetUp() {
             Tree.Reset();
             server = new LocalHttpServer();
-            savedIiif = Viewer.iiifBaseUrl;
+            savedIiif = IiifServer.current;
             savedDam = ManifestLoader.damBaseUrl;
-            Viewer.iiifBaseUrl = server.BaseUrl + "iiif/2/";
+            IiifServer.current = new IiifServer(server.BaseUrl + "iiif/2/");
             ManifestLoader.damBaseUrl = server.BaseUrl + "containers/";
 
             v = Priv.NewViewer();
@@ -37,7 +38,7 @@ namespace viewer.Tests {
 
         [TearDown]
         public void TearDown() {
-            Viewer.iiifBaseUrl = savedIiif;
+            IiifServer.current = savedIiif;
             ManifestLoader.damBaseUrl = savedDam;
             server.Dispose();
         }

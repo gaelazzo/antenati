@@ -32,7 +32,7 @@ namespace viewer.Tests {
         ServerProbe.Options Opt(int fastMs = 3000, int slowMs = 20000) => new ServerProbe.Options {
             SiteUrl = server.BaseUrl,
             ManifestUrl = server.BaseUrl + "containers/m1/manifest",
-            IiifBase = server.BaseUrl + "iiif/2/",
+            Iiif = new IiifServer(server.BaseUrl + "iiif/2/"),
             Width = 1000,
             ViewedCode = "VISTA",
             ColdCodes = new[] { "NUOVA1", "NUOVA2" },
@@ -51,14 +51,6 @@ namespace viewer.Tests {
                 if (path.Contains("manifest")) return Ok("application/json", Encoding.UTF8.GetBytes("{}"));
                 return Ok("text/html", Encoding.UTF8.GetBytes("<html>home</html>"));
             };
-        }
-
-        [Test]
-        public void Tasselli_ComeIlVisualizzatoreDelSito() {
-            // l'esempio reale: LPgEKzY, 3789x2784, tasselli 1024 a scala 2
-            var t = ServerProbe.TileRegions(3789, 2784, 1024, 2);
-            Assert.That(t, Is.EqualTo(new[] {
-                "0,0,2048,2048/1024,", "2048,0,1741,2048/871,", "0,2048,2048,736/1024,", "2048,2048,1741,736/871," }));
         }
 
         [Test]
