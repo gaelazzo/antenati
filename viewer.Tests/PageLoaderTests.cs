@@ -112,6 +112,46 @@ namespace viewer.Tests {
             Assert.That(req, Does.Contain("Accept-Language: it"));
         }
 
+        /// <summary>la richiesta contiene tutti gli header del sito (nome a inizio riga)</summary>
+        public static void AssertSiteHeaders(string req) {
+            foreach (var name in PageLoader.siteHeaders().Keys)
+                Assert.That(req, Does.Contain("\r\n" + name + ":"), $"manca {name} in\n{req}");
+        }
+
+        [Test]
+        public void HeaderDelSito_ComeIlVisualizzatoreDelSito() {
+            var h = PageLoader.siteHeaders();
+            Assert.That(h["Referer"], Is.EqualTo("https://antenati.cultura.gov.it"));
+            Assert.That(h["Origin"], Is.EqualTo("https://antenati.cultura.gov.it"));
+            Assert.That(h["Sec-Fetch-Site"], Is.EqualTo("same-site"));
+            Assert.That(h["Sec-Fetch-Mode"], Is.EqualTo("cors"));
+        }
+
+        [Test]
+        public void HeaderDelSito_ContengonoQuelliControllatiDalServer() {
+            // la WebView manda solo questi (il resto lo mette il browser), la WebView li prende da qui
+            var all = PageLoader.siteHeaders();
+            foreach (var kv in PageLoader.hotlinkHeaders())
+                Assert.That(all[kv.Key], Is.EqualTo(kv.Value), kv.Key);
+            Assert.That(PageLoader.hotlinkHeaders().Keys, Does.Contain("Referer"));
+        }
+
+        [Test]
+        public void HeaderDelSito_OgniVoltaUnaCopiaNuova() {
+            var a = PageLoader.siteHeaders();
+            a["Referer"] = "altro"; a.Remove("Origin");
+            Assert.That(PageLoader.siteHeaders()["Referer"], Is.EqualTo("https://antenati.cultura.gov.it"));
+            Assert.That(PageLoader.siteHeaders().ContainsKey("Origin"), Is.True);
+        }
+
+        [Test]
+        public void HeaderDelSito_InviatiTutti() {
+            server.Handler = _ => Ok("ok");
+            PageLoader.getResponseMessage(server.BaseUrl, headers: PageLoader.siteHeaders()).Dispose();
+            server.Requests.TryDequeue(out var req);
+            AssertSiteHeaders(req);
+        }
+
         [Test]
         public void Richiesta_InviaICookiePassati() {
             server.Handler = _ => Ok("ok");

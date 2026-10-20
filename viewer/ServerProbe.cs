@@ -53,13 +53,8 @@ namespace viewer {
 
         static Step Get(string name, string url, Options o, bool readBody, out string body) {
             body = null;
-            var headers = new Dictionary<string, string> {
-                ["Referer"] = "https://antenati.cultura.gov.it",
-                ["Origin"] = "https://antenati.cultura.gov.it",
-                ["Sec-Fetch-Site"] = "same-site",
-            };
             var sw = Stopwatch.StartNew();
-            using (var r = PageLoader.getResponseMessage(url, HttpCompletionOption.ResponseContentRead, headers, null, o.Timeout)) {
+            using (var r = PageLoader.getResponseMessage(url, HttpCompletionOption.ResponseContentRead, PageLoader.siteHeaders(), null, o.Timeout)) {
                 var step = new Step { Name = name, Ms = sw.ElapsedMilliseconds, Status = r == null ? 0 : (int)r.StatusCode };
                 if (readBody && r != null && r.IsSuccessStatusCode)
                     body = r.Content.ReadAsStringAsync().Result;

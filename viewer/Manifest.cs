@@ -252,31 +252,8 @@ namespace viewer {
                 cookies.Add("PHPSESSID", PageLoader.getCookie("PHPSESSID"));
                 cookies.Add("path", "/");
 
-                Dictionary<string, string> headers = new Dictionary<string, string>();
-                //headers.Add(":authority", "dam-antenati.cultura.gov.it");
-                //headers.Add(":method", "GET");
-                //headers.Add( ":path", $"/antenati/containers/{manifestId}/manifest");
-                //headers.Add(":scheme", "https");
-                headers.Add("Accept", "*/*");
-                headers.Add("Accept-Encoding", "gzip, deflate");
-                headers.Add("Accept-Language", "it,en-US;q=0.9,en;q=0.8");
-                headers.Add("Origin", "https://antenati.cultura.gov.it");
-                headers.Add("Priority", "u=1, i");
-                headers.Add("Referer", "https://antenati.cultura.gov.it");
-
-                headers.Add("Sec-Ch-Ua", @"""Chromium"";v=""142"", ""Google Chrome"";v=""142"", ""Not?A_Brand"";v=""99""");
-                headers.Add("Sec-Ch-Ua-Mobile", "?0");
-                headers.Add("Sec-Ch-Ua-Platform", "\"Windows\"");
-                headers.Add("Sec-Fetch-Dest", "empty");
-                headers.Add("Sec-Fetch-Mode", "cors");
-                headers.Add("Sec-Fetch-Site", "same-site");
-                //headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36");
-
-				
-
-
 				// Effettua una richiesta GET per ottenere il JSON
-				HttpResponseMessage response = PageLoader.getResponseMessage(url,HttpCompletionOption.ResponseContentRead, headers, cookies);
+				HttpResponseMessage response = PageLoader.getResponseMessage(url,HttpCompletionOption.ResponseContentRead, PageLoader.siteHeaders(), cookies);
                 response.EnsureSuccessStatusCode(); // Lancia un'eccezione se lo stato non è 200 OK
 
                 Console.WriteLine(response.Content.Headers.ContentEncoding.FirstOrDefault());
@@ -316,31 +293,8 @@ namespace viewer {
 				cookies.Add("PHPSESSID", PageLoader.getCookie("PHPSESSID"));
 				cookies.Add("path", "/");
 
-				Dictionary<string, string> headers = new Dictionary<string, string>();
-				//headers.Add(":authority", "dam-antenati.cultura.gov.it");
-				//headers.Add(":method", "GET");
-				//headers.Add( ":path", $"/antenati/containers/{manifestId}/manifest");
-				//headers.Add(":scheme", "https");
-				headers.Add("Accept", "*/*");
-                headers.Add("Accept-Encoding", "gzip, deflate");
-                headers.Add("Accept-Language", "it,en-US;q=0.9,en;q=0.8");
-				headers.Add("Origin", "https://antenati.cultura.gov.it");
-				headers.Add("Priority", "u=1, i");
-				headers.Add("Referer", "https://antenati.cultura.gov.it");
-
-				headers.Add("Sec-Ch-Ua", @"""Chromium"";v=""142"", ""Google Chrome"";v=""142"", ""Not?A_Brand"";v=""99""");
-				headers.Add("Sec-Ch-Ua-Mobile", "?0");
-				headers.Add("Sec-Ch-Ua-Platform", "\"Windows\"");
-				headers.Add("Sec-Fetch-Dest", "empty");
-				headers.Add("Sec-Fetch-Mode", "cors");
-				headers.Add("Sec-Fetch-Site", "same-site");
-				//headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36");
-
-
-
-
 				// Effettua una richiesta GET per ottenere il JSON
-				HttpResponseMessage response = PageLoader.getResponseMessage(url, HttpCompletionOption.ResponseContentRead, headers, cookies);
+				HttpResponseMessage response = PageLoader.getResponseMessage(url, HttpCompletionOption.ResponseContentRead, PageLoader.siteHeaders(), cookies);
 				response.EnsureSuccessStatusCode(); // Lancia un'eccezione se lo stato non è 200 OK
 
 				// Legge il contenuto della risposta come stringa

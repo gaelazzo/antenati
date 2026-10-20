@@ -27,6 +27,38 @@ namespace viewer {
             return null;
         }
 
+        /// <summary>
+        /// Header di cui i server di dati di Antenati (immagini IIIF, manifest) controllano la provenienza:
+        /// senza Referer Cloudflare risponde 403 "Sorry, you have been blocked" (verificato il 20/10/2026).
+        /// Sono quelli che la WebView aggiunge alle richieste del browser.
+        /// </summary>
+        public static Dictionary<string, string> hotlinkHeaders() {
+            return new Dictionary<string, string> {
+                ["Referer"] = "https://antenati.cultura.gov.it",
+                ["Sec-Fetch-Site"] = "same-site",
+            };
+        }
+
+        /// <summary>
+        /// Header di una richiesta ai server di dati (manifest, info.json, immagini) come la manda il
+        /// visualizzatore del sito da Chrome: i controlli di provenienza piu' il resto del browser.
+        /// Ogni chiamata da' una copia nuova.
+        /// </summary>
+        public static Dictionary<string, string> siteHeaders() {
+            var h = hotlinkHeaders();
+            h["Origin"] = "https://antenati.cultura.gov.it";
+            h["Accept"] = "*/*";
+            h["Accept-Encoding"] = "gzip, deflate";
+            h["Accept-Language"] = "it,en-US;q=0.9,en;q=0.8";
+            h["Priority"] = "u=1, i";
+            h["Sec-Ch-Ua"] = @"""Chromium"";v=""142"", ""Google Chrome"";v=""142"", ""Not?A_Brand"";v=""99""";
+            h["Sec-Ch-Ua-Mobile"] = "?0";
+            h["Sec-Ch-Ua-Platform"] = "\"Windows\"";
+            h["Sec-Fetch-Dest"] = "empty";
+            h["Sec-Fetch-Mode"] = "cors";
+            return h;
+        }
+
 		public static HttpResponseMessage getResponseMessage(string url,
                 HttpCompletionOption opt = HttpCompletionOption.ResponseContentRead,
                 Dictionary<string, string> headers = null,

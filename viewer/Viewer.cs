@@ -187,9 +187,10 @@ namespace viewer {
                 webView.CoreWebView2.AddWebResourceRequestedFilter(
                     IiifServer.current.requestFilter,
                     Microsoft.Web.WebView2.Core.CoreWebView2WebResourceContext.All);
+                var hotlink = PageLoader.hotlinkHeaders();
                 webView.CoreWebView2.WebResourceRequested += (s, ev) => {
-                    ev.Request.Headers.SetHeader("Referer", "https://antenati.cultura.gov.it");
-                    ev.Request.Headers.SetHeader("Sec-Fetch-Site", "same-site");
+                    foreach (var kv in hotlink)
+                        ev.Request.Headers.SetHeader(kv.Key, kv.Value);
                 };
             }
             catch (Exception ex) {
@@ -1453,17 +1454,7 @@ namespace viewer {
                 Console.WriteLine($"[{ora()}] Richiedo file immagine {url}" + (msCoda > 100 ? $" (dopo {msCoda} ms in coda)" : ""));
 				Dictionary<string, string> cookies = new Dictionary<string, string>();
 
-				Dictionary<string, string> headers = new Dictionary<string, string>();
-                headers.Add("Accept-Encoding", "gzip, deflate");
-                headers.Add("Referer", "https://antenati.cultura.gov.it");
-
-				headers.Add("Sec-Ch-Ua", @"""Chromium"";v=""142"", ""Google Chrome"";v=""142"", ""Not?A_Brand"";v=""99""");
-				headers.Add("Sec-Ch-Ua-Mobile", "?0");
-				headers.Add("Sec-Ch-Ua-Platform", "\"Windows\"");
-				headers.Add("Sec-Fetch-Dest", "empty");
-				headers.Add("Sec-Fetch-Mode", "cors");
-				headers.Add("Sec-Fetch-Site", "same-site");
-				//headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36");
+				var headers = PageLoader.siteHeaders();
 
 				var swServer = System.Diagnostics.Stopwatch.StartNew();
 				var response = PageLoader.getResponseMessage(url, HttpCompletionOption.ResponseContentRead, headers, cookies, imageTimeout, cancel);

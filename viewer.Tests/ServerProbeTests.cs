@@ -62,6 +62,9 @@ namespace viewer.Tests {
                 "Sito antenati", "Manifest del registro", "Immagine gia' vista", "Pagina nuova (modo del programma)", "Pagina nuova (tasselli, come il sito)" }));
             Assert.That(r.Verdict, Does.StartWith("Server veloce"));
             Assert.That(server.Requests.Count(q => q.Contains("/NUOVA2/") && !q.Contains("info.json")), Is.EqualTo(4), "4 tasselli");
+            // le stesse richieste del programma, altrimenti la misura non dice niente sul programma
+            foreach (var q in server.Requests.Where(q => q.Contains("/iiif/2/") || q.Contains("manifest")))
+                PageLoaderTests.AssertSiteHeaders(q);
         }
 
         [Test]

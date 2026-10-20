@@ -120,6 +120,17 @@ namespace viewer.Tests {
             server.Requests.TryPeek(out var req);
             Assert.That(req, Does.Contain("Referer: https://antenati.cultura.gov.it"));
             Assert.That(req, Does.Contain("Sec-Fetch-Site: same-site"));
+            PageLoaderTests.AssertSiteHeaders(req);
+        }
+
+        [Test]
+        public void InfoJson_HeaderDelSito() {
+            server.Handler = _ => ("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n", Encoding.UTF8.GetBytes("{\"width\":3789,\"height\":2784}"));
+            var info = ManifestLoader.LoadInfoJsonAsync("LPgEKzY").Result;
+            Assert.That(info.width, Is.EqualTo(3789));
+            server.Requests.TryPeek(out var req);
+            Assert.That(Path0(req), Is.EqualTo("/iiif/2/LPgEKzY/info.json"));
+            PageLoaderTests.AssertSiteHeaders(req);
         }
 
         [TestCase(404, "Not Found")]
@@ -588,6 +599,7 @@ namespace viewer.Tests {
             Assert.That(Path0(req), Is.EqualTo("/containers/wOgD6pM/manifest"));
             Assert.That(req, Does.Contain("Origin: https://antenati.cultura.gov.it"));
             Assert.That(req, Does.Contain("Sec-Fetch-Mode: cors"));
+            PageLoaderTests.AssertSiteHeaders(req);
         }
 
         [Test]
