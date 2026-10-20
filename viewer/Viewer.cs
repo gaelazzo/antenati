@@ -1580,6 +1580,7 @@ namespace viewer {
                     // attesa del posto annullabile: una pagina lasciata non deve restare in coda
                     if (WaitHandle.WaitAny(new WaitHandle[] { Sdownload, cancel.WaitHandle }) != 0) {
                         Console.WriteLine($"[{ora()}] {code}: annullato mentre era in coda");
+                        downloadStats?.AddCancelled(code);
                         return false;
                     }
                     acquired = true;
@@ -1627,11 +1628,13 @@ namespace viewer {
 
 				if (cancel.IsCancellationRequested) {
 					Console.WriteLine($"[{ora()}] {code}: annullato dopo {msServer} ms");
+					downloadStats?.AddCancelled(code);
 					response?.Dispose();
 					return false;
 				}
 				if (response == null || !response.IsSuccessStatusCode) {
 					Console.WriteLine($"[{ora()}] {code}: HTTP Error {(int?)response?.StatusCode}: {response?.ReasonPhrase} dopo {msServer} ms");
+					downloadStats?.Add(code, response == null ? 0 : (int)response.StatusCode, msCoda, msServer);
 					return false;
 				}
                 // Verifica Content-Length se disponibile
@@ -1681,15 +1684,18 @@ namespace viewer {
                 long msTot = swTot.ElapsedMilliseconds;
                 Console.WriteLine($"[{ora()}] {code}: {(result ? "OK" : "SCARTATO")} {f.Length / 1024} KB in {msTot} ms " +
                                   $"(coda {msCoda}, server {msServer}, disco {msTot - msCoda - msServer})");
+                downloadStats?.Add(code, (int)response.StatusCode, msCoda, msServer);
                 if (currExploring == url)
                     currExploring = "";
                 return result;
             }
             catch (OperationCanceledException) {
                 Console.WriteLine($"[{ora()}] {code}: annullato dopo {swTot.ElapsedMilliseconds} ms");
+                downloadStats?.AddCancelled(code);
             }
             catch (Exception e) {
 				Console.WriteLine($"[{ora()}] {code}: queueDownloadFile dopo {swTot.ElapsedMilliseconds} ms: {e.Message}");
+				downloadStats?.Add(code, 0, msCoda, swTot.ElapsedMilliseconds - msCoda);
 			}
             finally {
                 if (acquired)
@@ -3054,6 +3060,46 @@ namespace viewer {
         private void rielaboraNomiToolStripMenuItem_Click(object sender, EventArgs e) {
             var parent = treeMain.SelectedNode;
             rielaboraNomi(parent);
+        }
+
+        // Ultimi download di immagini (tempi, esiti) per la Diagnosi tempi
+        DownloadStats downloadStats = new DownloadStats();
+
+        /// <summary>
+        /// Cosa misura la Diagnosi tempi nel registro corrente: la pagina a video come "immagine gia'
+        /// vista" e due pagine mai scaricate prese dalla fine del registro (fuori dal precaricamento).
+        /// </summary>
+        ServerProbe.Options buildDiagnosisOptions() {
+            var o = new ServerProbe.Options { Width = dimension };
+            var r = getCurrRegister();
+            if (r?.manifestId != null)
+                o.ManifestUrl = ManifestLoader.damBaseUrl + r.manifestId + "/manifest";
+            var map = mapPage;
+            if (map == null)
+                return o;
+            int shown = nEffettivo > 0 ? nEffettivo : getNum();
+            if (map.TryGetValue(shown, out string viewed))
+                o.ViewedCode = viewed;
+            o.ColdCodes = map.OrderByDescending(kv => kv.Key)
+                .Select(kv => kv.Value)
+                .Where(c => c != viewed && !downloads.IsInFlight(c) && !File.Exists(PathFromCode(c) ?? ""))
+                .Take(2)
+                .ToArray();
+            return o;
+        }
+
+        private void btnDiagnosi_Click(object sender, EventArgs e) {
+            var o = buildDiagnosisOptions();
+            btnDiagnosi.Enabled = false;
+            txtDiagnosi.Text = "Diagnosi in corso (pochi secondi, piu' a lungo se il server e' lento)...";
+            Task.Run(() => ServerProbe.Run(o, downloadStats)).ContinueWith(t => {
+                string text = t.IsFaulted ? "Diagnosi non riuscita: " + t.Exception.GetBaseException().Message : t.Result.Text;
+                Console.WriteLine(text);
+                BeginInvoke(new Action(() => {
+                    txtDiagnosi.Text = text;
+                    btnDiagnosi.Enabled = true;
+                }));
+            });
         }
 
         private void btnCancellaPiccoli_Click(object sender, EventArgs e) {

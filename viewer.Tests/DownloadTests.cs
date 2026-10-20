@@ -371,6 +371,41 @@ namespace viewer.Tests {
         }
 
         [Test]
+        public void Diagnosi_PagineScelteBene() {
+            // gia' vista = pagina a video; nuove = dalla fine del registro, ne' in cache ne' in download
+            var c = Enumerable.Range(0, 6).Select(_ => NewCode()).ToArray();
+            PrepareRegister(c);
+            Priv.Set(v, "dimension", 1200);
+            Priv.Set(v, "nEffettivo", 2);
+            Directory.CreateDirectory("data");
+            File.WriteAllBytes(Path.Combine("data", Priv.Call<string>(v, "extendCode", c[5] + ".jpg")), new byte[20000]);
+            var gate = new System.Threading.Tasks.TaskCompletionSource<string>();
+            ((InFlightDownloads)Priv.Get(v, "downloads")).GetOrStart(c[4], _ => gate.Task);
+            try {
+                var o = Priv.Call<ServerProbe.Options>(v, "buildDiagnosisOptions");
+                Assert.That(o.ViewedCode, Is.EqualTo(c[1]));
+                Assert.That(o.ColdCodes, Is.EqualTo(new[] { c[3], c[2] }), "pagina 6 in cache, pagina 5 in download");
+                Assert.That(o.Width, Is.EqualTo(1200));
+                Assert.That(o.ManifestUrl, Is.Null, "registro senza manifestId");
+            }
+            finally { gate.SetResult(null); }
+        }
+
+        [Test]
+        public void Diagnosi_RegistraIDownload() {
+            string code = NewCode();
+            PrepareRegister(code);
+            var st = new DownloadStats();
+            Priv.Set(v, "downloadStats", st);
+            server.Handler = _ => Status(500, "Internal Server Error");
+            LoadImage(code);
+            server.Handler = _ => Image(Jpeg);
+            LoadImage(code);
+            var e = st.Snapshot();
+            Assert.That(e.Select(x => x.Status), Is.EqualTo(new[] { 500, 200 }));
+        }
+
+        [Test]
         public void UltimaPaginaVista_SalvataQuandoVaAVideo() {
             PrepareRegister("a", "b", "c");
             Priv.Call(v, "rememberPageShown", 3);

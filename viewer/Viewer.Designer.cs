@@ -109,6 +109,8 @@ namespace viewer {
             this.label9 = new System.Windows.Forms.Label();
             this.contrastBar = new System.Windows.Forms.TrackBar();
             this.btnCancellaPiccoli = new System.Windows.Forms.Button();
+            this.btnDiagnosi = new System.Windows.Forms.Button();
+            this.txtDiagnosi = new System.Windows.Forms.TextBox();
             this.btnIntegraIndice = new System.Windows.Forms.Button();
             this.btnCalcolaCitta = new System.Windows.Forms.Button();
             this.historyList = new System.Windows.Forms.ListBox();
@@ -932,6 +934,8 @@ namespace viewer {
             this.tabPage3.Controls.Add(this.label9);
             this.tabPage3.Controls.Add(this.contrastBar);
             this.tabPage3.Controls.Add(this.btnCancellaPiccoli);
+            this.tabPage3.Controls.Add(this.btnDiagnosi);
+            this.tabPage3.Controls.Add(this.txtDiagnosi);
             this.tabPage3.Controls.Add(this.btnIntegraIndice);
             this.tabPage3.Controls.Add(this.btnCalcolaCitta);
             this.tabPage3.Controls.Add(this.historyList);
@@ -1044,6 +1048,28 @@ namespace viewer {
             this.btnCancellaPiccoli.Text = "RemoveMistakes";
             this.btnCancellaPiccoli.UseVisualStyleBackColor = true;
             this.btnCancellaPiccoli.Click += new System.EventHandler(this.btnCancellaPiccoli_Click);
+            //
+            // btnDiagnosi
+            //
+            this.btnDiagnosi.Location = new System.Drawing.Point(890, 123);
+            this.btnDiagnosi.Name = "btnDiagnosi";
+            this.btnDiagnosi.Size = new System.Drawing.Size(118, 23);
+            this.btnDiagnosi.TabIndex = 25;
+            this.btnDiagnosi.Text = "Diagnosi tempi";
+            this.btnDiagnosi.UseVisualStyleBackColor = true;
+            this.btnDiagnosi.Click += new System.EventHandler(this.btnDiagnosi_Click);
+            //
+            // txtDiagnosi
+            //
+            this.txtDiagnosi.Font = new System.Drawing.Font("Consolas", 8.25F);
+            this.txtDiagnosi.Location = new System.Drawing.Point(890, 152);
+            this.txtDiagnosi.Multiline = true;
+            this.txtDiagnosi.Name = "txtDiagnosi";
+            this.txtDiagnosi.ReadOnly = true;
+            this.txtDiagnosi.ScrollBars = System.Windows.Forms.ScrollBars.Both;
+            this.txtDiagnosi.Size = new System.Drawing.Size(385, 664);
+            this.txtDiagnosi.TabIndex = 26;
+            this.txtDiagnosi.WordWrap = true;
             // 
             // btnIntegraIndice
             // 
@@ -2257,6 +2283,8 @@ namespace viewer {
         private System.Windows.Forms.ToolStripMenuItem impostaIndiceToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem rielaboraNomiToolStripMenuItem;
         private System.Windows.Forms.Button btnCancellaPiccoli;
+        private System.Windows.Forms.Button btnDiagnosi;
+        private System.Windows.Forms.TextBox txtDiagnosi;
         private System.Windows.Forms.Button btnApplicaContrasto;
         private System.Windows.Forms.Label label9;
         private System.Windows.Forms.TrackBar contrastBar;
