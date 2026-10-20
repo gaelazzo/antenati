@@ -124,8 +124,12 @@ namespace viewer {
         /// Visita la home di Antenati in background per ottenere PHPSESSID e i cookie del bilanciatore
         /// </summary>
         public static void StartWarmUp() {
-            warmUpTask = Task.Run(() => getResponseMessage("https://antenati.cultura.gov.it/")?.Dispose());
+            string url = warmUpUrl;
+            warmUpTask = Task.Run(() => getResponseMessage(url)?.Dispose());
         }
+
+        // Home di Antenati per il warm-up (modificabile solo dai test, per puntare a un server locale)
+        public static string warmUpUrl = "https://antenati.cultura.gov.it/";
 
         /// <summary>
         /// Attende la fine del warm-up: va chiamato da chi ha bisogno di PHPSESSID
