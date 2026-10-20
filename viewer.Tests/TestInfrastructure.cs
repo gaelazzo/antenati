@@ -30,6 +30,7 @@ namespace viewer.Tests {
             File.WriteAllText(Path.Combine(Root, Archivio.archiveName), "[]");
             originalDir = Environment.CurrentDirectory;
             Environment.CurrentDirectory = Root;
+            Viewer.soundsEnabled = false;     // niente beep mentre girano i test
 
             // Come Program.Main: il codice blocca su .Result (sync-over-async) e i test di concorrenza
             // lanciano decine di richieste insieme; con i thread minimi di default il pool cresce di

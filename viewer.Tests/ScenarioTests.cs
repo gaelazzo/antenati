@@ -100,7 +100,14 @@ namespace viewer.Tests {
         LocalHttpServer server;
         string savedIiif, savedWarm, savedDir;
         StringWriter log;
-        TextWriter savedOut;
+        TextWriter syncLog, savedOut;
+
+        /// <summary>
+        /// Testo del log letto sotto lo stesso lucchetto delle scritture (il wrapper Synchronized si blocca
+        /// su se stesso): leggere log.ToString() mentre i thread del Viewer scrivevano faceva lanciare
+        /// ogni tanto ArgumentOutOfRangeException allo StringBuilder interno
+        /// </summary>
+        string LogText() { lock (syncLog) { return log.ToString(); } }
         ViewerHost host;
         readonly ConcurrentDictionary<string, int> delayMs = new ConcurrentDictionary<string, int>();
         readonly ConcurrentDictionary<string, int> status = new ConcurrentDictionary<string, int>();
@@ -157,7 +164,8 @@ namespace viewer.Tests {
 
             savedOut = Console.Out;
             log = new StringWriter();
-            Console.SetOut(TextWriter.Synchronized(log));
+            syncLog = TextWriter.Synchronized(log);
+            Console.SetOut(syncLog);
         }
 
         [TearDown]
@@ -178,7 +186,7 @@ namespace viewer.Tests {
 
         void Slow(string reg, int ms) { foreach (int p in Pages) delayMs[Code(reg, p)] = ms; }
 
-        int TimesShown(int page) => Regex.Matches(log.ToString(), $@"\] Pagina {page} a video").Count;
+        int TimesShown(int page) => Regex.Matches(LogText(), $@"\] Pagina {page} a video").Count;
         int Requests(string code) => server.Requests.Count(r => r.Contains("/" + code + "/"));
 
         [Test]
@@ -220,7 +228,9 @@ namespace viewer.Tests {
             // Server lento: il precaricamento partito da pagina 2 ha 2,3,4 in volo. Andando avanti, quello
             // nuovo deve chiedere subito la pagina 5 invece di aspettare che il vecchio liberi un posto
             // (prima un precaricamento in corso impediva di avviarne un altro)
-            Slow(R1, 4000);
+            // 8 s per immagine: col comportamento sbagliato la 5 partirebbe solo dopo ~8 s (quando il
+            // vecchio precaricamento libera un posto); il limite di 3 s lascia margine a una macchina carica
+            Slow(R1, 8000);
             delayMs[Code(R1, 1)] = 0;
             Start(R1, 1);
             host.WaitUntil(() => host.Shown == 1, 10000, "pagina 1");
@@ -228,7 +238,7 @@ namespace viewer.Tests {
             Assert.That(Requests(Code(R1, 5)), Is.EqualTo(0));
 
             host.Next(); host.Next();                       // pagina 3
-            host.WaitUntil(() => Requests(Code(R1, 5)) == 1, 1500, "pagina 5 chiesta subito");
+            host.WaitUntil(() => Requests(Code(R1, 5)) == 1, 3000, "pagina 5 chiesta subito");
             Assert.That(Requests(Code(R1, 3)), Is.EqualTo(1), "le pagine gia' in volo si riagganciano, non si richiedono");
         }
 
@@ -295,6 +305,21 @@ namespace viewer.Tests {
             }, 8000);
             Assert.That(returned, Is.True, "finestra bloccata dal Reset su pagina non in cache");
             host.WaitUntil(() => host.Shown == 8, 10000, "pagina 8 a video");
+        }
+
+        [Test]
+        public void VaiAllIndice_SenzaRegistroCorrente_NessunaEccezione() {
+            // "&" al posto di "&&": senza registro corrente leggeva comunque registro.idRegistroIndice.
+            // Succede se il registro resta selezionato ma "vuoto" (es. manifest non caricato).
+            Start(R1, 1);
+            host.WaitUntil(() => host.Shown == 1, 10000, "pagina 1");
+            Exception err = null;
+            host.Do(() => {
+                Priv.Set(host.V, "idRegistro", null);
+                try { Priv.Call(host.V, "btnGoToIndex_Click", null, EventArgs.Empty); }
+                catch (Exception e) { err = e; }
+            });
+            Assert.That(err, Is.Null, "vai all'indice senza registro corrente: " + err);
         }
 
         [Test]

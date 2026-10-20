@@ -952,7 +952,7 @@ namespace viewer {
             }
 
             this.Text = getNodePath(treeMain.SelectedNode) + "    -    " + getNodeAddress(tn);
-            lbCity.Text = getCity(treeMain.SelectedNode) + " " + r.kind ?? "";
+            lbCity.Text = getCity(treeMain.SelectedNode) + " " + (r.kind ?? "");
             toPushHistory = true;
         }
 
@@ -1064,7 +1064,7 @@ namespace viewer {
                 return;
             }
             if (!btnRotateReg.Visible && par.Nodes.Count > 1) {
-                Console.Beep(2000, 200);
+                beep(2000, 200);
             }
             btnRotateReg.Visible = par.Nodes.Count > 1;
         }
@@ -1548,6 +1548,12 @@ namespace viewer {
 
 
         static string ora() => DateTime.Now.ToString("HH:mm:ss.fff");
+
+        // Segnali acustici del programma. Spenti solo dai test (Sandbox), che altrimenti suonano a ogni
+        // scenario: es. aprire un registro con altri registri nello stesso gruppo (updateRotateRegister).
+        public static bool soundsEnabled = true;
+        static void beep(int frequency, int duration) { if (soundsEnabled) Console.Beep(frequency, duration); }
+        static void beepSystem() { if (soundsEnabled) System.Media.SystemSounds.Beep.Play(); }
 
         // Il 18/10/2026, col server sotto carico, un'immagine richiedeva 16-77 s e 5 richieste su 16
         // superavano i 100 s del timeout predefinito di .NET. Oltre ~125 s pero' risponde Cloudflare
@@ -2259,7 +2265,7 @@ namespace viewer {
                 if (curr != null && curr.Nodes.Count > 0) {
                     curr = curr.Nodes[0];
                     nfound++;
-                    Console.Beep(200, 50);
+                    beep(200, 50);
                 }
             }
             if (curr != null && nfound == parts.Length) {
@@ -2846,7 +2852,7 @@ namespace viewer {
         private void btnGoToIndex_Click(object sender, EventArgs e) {
             pushHistory(getMark());
             var registro = getCurrRegister();
-            if (registro != null & registro.idRegistroIndice != null) {
+            if (registro != null && registro.idRegistroIndice != null) {
                 //Codice per impostare mappa idRegistroIndice
                 //TODO  
                 int N = registro.nPaginaIndice;
@@ -2972,35 +2978,71 @@ namespace viewer {
             }
         }
 
+        // Menu dell'albero "imposta pagina": l'indice del registro selezionato e' nello stesso registro,
+        // a pagina X (come "imposta indice interno" col tasto destro sull'immagine); 0 o vuoto lo toglie
         private void impostaPaginaToolStripMenuItem_Click(object sender, EventArgs e) {
             var n = treeMain.SelectedNode;
             if (n == null)
                 return;
+            var r = (n.Tag as RegNode)?.archiveNode as Registro;
+            string current = r != null && r.idRegistroIndice == r.idRegistro && r.nPaginaIndice != 0 ? r.nPaginaIndice.ToString() : "";
 
-            var f = new frmAskData("Pagina associata al nodo", "Numero pagina", n.Tag?.ToString() ?? "");
+            var f = new frmAskData("Pagina dell'indice interno al registro", "Numero pagina", current);
             if (f.ShowDialog(this) == DialogResult.OK) {
-                n.Tag = f.resultValue;
+                string msg = setInternalIndexPage(n, toIntOrDefault(f.resultValue));
+                if (msg != null)
+                    MessageBox.Show(msg, "Pagina indice");
             }
         }
 
+        /// <summary>
+        /// Indice interno al registro del nodo, a pagina page (0 = toglie il collegamento).
+        /// Prima il numero finiva nel Tag del nodo al posto del RegNode: non lo rileggeva nessuno e il
+        /// nodo perdeva l'identita' di registro fino al riavvio.
+        /// </summary>
+        string setInternalIndexPage(TreeNode n, int page) {
+            var r = (n?.Tag as RegNode)?.archiveNode as Registro;
+            if (r == null)
+                return "Seleziona un registro nell'albero.";
+            return setIndexPage(r, r, page);
+        }
+
+        // Menu dell'albero "imposta n. pagina indice": pagina dell'indice gia' collegato (quella a cui
+        // porta "vai all'indice"); 0 o vuoto toglie il collegamento
         private void impostaIndiceToolStripMenuItem_Click(object sender, EventArgs e) {
 
             var reg = getCurrRegister();
             var indexReg = getCurrIndexRegister();
 
             var f = new frmAskData("N. pagina indice associato al nodo", "N. Pagina indice",
-                    indexReg == null ? "" : indexReg.nPaginaIndice.ToString());
+                    reg == null || reg.nPaginaIndice == 0 ? "" : reg.nPaginaIndice.ToString());
             if (f.ShowDialog(this) == DialogResult.OK) {
-                int N = toIntOrDefault(f.resultValue);
-                if (N != 0) {
-                    reg.idRegistroIndice = null;
-                    reg.nPaginaIndice = 0;
-                    return;
-                }
-                reg.nPaginaIndice = N;
-                reg.idRegistroIndice = indexReg.idRegistro;
+                string msg = setIndexPage(reg, indexReg, toIntOrDefault(f.resultValue));
+                if (msg != null)
+                    MessageBox.Show(msg, "Pagina indice");
             }
 
+        }
+
+        /// <summary>
+        /// Pagina indice del registro: page != 0 la imposta sull'indice collegato (indexReg), 0 toglie il
+        /// collegamento. Restituisce un messaggio per l'utente se non si puo' fare, altrimenti null.
+        /// Prima la condizione era invertita (un numero cancellava, 0 collegava con pagina 0) e senza
+        /// indice collegato andava in NullReferenceException.
+        /// </summary>
+        static string setIndexPage(Registro reg, Registro indexReg, int page) {
+            if (reg == null)
+                return "Nessun registro selezionato.";
+            if (page == 0) {
+                reg.idRegistroIndice = null;
+                reg.nPaginaIndice = 0;
+                return null;
+            }
+            if (indexReg == null)
+                return "Il registro non ha un indice collegato: collegalo prima con \"crea indice\" o con \"imposta indice interno\" (tasto destro sull'immagine).";
+            reg.idRegistroIndice = indexReg.idRegistro;
+            reg.nPaginaIndice = page;
+            return null;
         }
 
         bool extractDate(string s, out int anno, out int mese, out int giorno) {
@@ -3977,10 +4019,10 @@ namespace viewer {
                 if (!important.ContainsKey(curr.rif)) {
                     important.Add(curr.rif, new Squeeze(await ShortenUrl(url), url));
                     await addImportanteImage();
-                    Console.Beep(400, 300);
+                    beep(400, 300);
                 }
                 else {
-                    System.Media.SystemSounds.Beep.Play();
+                    beepSystem();
                 }
             }
         }
@@ -4144,13 +4186,13 @@ namespace viewer {
                 anno = anno + delta;
                 parts[parts.Length - 3] = anno.ToString();
                 if (!setNodePath(treeMain, String.Join("/", parts.ToList()))) {
-                    System.Media.SystemSounds.Beep.Play();
+                    beepSystem();
                     if (parts[parts.Length - 2].Contains(", indice") || parts[parts.Length - 2].Contains(", indici")) {
                         parts[parts.Length - 2] = parts[parts.Length - 2].Replace(", indice", "").Replace(", indici", "");
                         if (!setNodePath(treeMain, String.Join("/", parts.ToList()))) {  // va al registro se possibile
                             //Se non è possibile torna alla posizione di partenza
                             setNodePath(treeMain, path);
-                            Console.Beep(400, 500);
+                            beep(400, 500);
                             moved = false;
                         }
                     };
@@ -4763,7 +4805,7 @@ namespace viewer {
             if (String.IsNullOrEmpty(rif))
                 return;
             rif = rif.Split(new string[] { " - " }, StringSplitOptions.RemoveEmptyEntries)[0].Trim();
-            Console.Beep(100, 100);
+            beep(100, 100);
             Clipboard.SetText(rif);
             gotoRegister(rif);
             pushHistory(getMark());
