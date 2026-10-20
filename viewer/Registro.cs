@@ -30,7 +30,7 @@ namespace viewer {
         const string RegistroAddress = AntenatiSite.root + "search-registry/?serie={idSerie}&s_facet_query=tipologia_ss%3A{kind}%252Canni_is%3A{anno}";
 
 
-        const string RegistroAddress2 = AntenatiSite.root + "search-registry/?localita={localita}&s_facet_query=tipologia_ss%3A{kind}%252anni_is%3A{anno}";
+        const string RegistroAddress2 = AntenatiSite.root + "search-registry/?localita={localita}&s_facet_query=tipologia_ss%3A{kind}%252Canni_is%3A{anno}";
 
         /// <summary>Inizio dell'indirizzo permanente (ark) di ogni registro</summary>
         public const string arkPrefix = AntenatiSite.root + "ark:/12657/";

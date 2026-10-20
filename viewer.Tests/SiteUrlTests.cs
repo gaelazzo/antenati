@@ -68,9 +68,9 @@ namespace viewer.Tests {
             Assert.That(viewer.Registro.registroById["282248"].href, Is.EqualTo(S + "ark:/12657/an_ua282248"));
             Assert.That(Static(typeof(Registro), "getIndexUrl", "282216", "1813", "Nati"),
                 Is.EqualTo(S + "search-registry/?serie=282216&s_facet_query=tipologia_ss%3ANati%252Canni_is%3A1813"));
-            // "%252anni" senza la C: e' cosi' da sempre, qui si fissa com'e'
+            // fino al 20/10/2026 mancava la C ("%252anni"): la virgola che separa tipologia e anno
             Assert.That(viewer.Registro.getIndexUrl2("282216", "1813", "Nati"),
-                Is.EqualTo(S + "search-registry/?localita=Bari&s_facet_query=tipologia_ss%3ANati%252anni_is%3A1813"));
+                Is.EqualTo(S + "search-registry/?localita=Bari&s_facet_query=tipologia_ss%3ANati%252Canni_is%3A1813"));
         }
 
         [Test]
