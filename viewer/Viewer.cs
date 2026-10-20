@@ -1977,7 +1977,7 @@ namespace viewer {
 
 
 
-        const string addrPrefix = "https://antenati.cultura.gov.it/";
+        const string addrPrefix = AntenatiSite.root;
 
 
 
@@ -3581,7 +3581,7 @@ namespace viewer {
         string redirectUrl(string url) {
             if (url.StartsWith("http://dl.antenati.san.beniculturali.it"))
                 return url;
-            if (url.StartsWith("https://antenati.cultura.gov.it/ark:/12657"))
+            if (url.StartsWith(Registro.arkPrefix))
                 return url;
             if (isShortened(url)) {
                 string expanded = expandUrl(url);
@@ -3600,7 +3600,7 @@ namespace viewer {
             url = url.Split(' ')[0].Trim();  // Se l'indirizzo è seguito da altra roba, ignorala
 
             url = redirectUrl(url);
-            if (url.StartsWith("https://antenati.cultura.gov.it/ark:/12657/")) {
+            if (url.StartsWith(Registro.arkPrefix)) {
                 //https://antenati.cultura.gov.it/ark:/12657/an_ua17439642/wbOG7kv
                 string id = Registro.idFromHref(url);
                 if (id != null) {

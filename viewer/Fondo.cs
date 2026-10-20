@@ -20,7 +20,7 @@ namespace viewer {
         public static List<Fondo> fondi = new List<Fondo>();
         public static Dictionary<string, Fondo> fondoById = new Dictionary<string, Fondo>();
 
-        const string FondoIndexUrl = "https://antenati.cultura.gov.it/archive/?archivio={idArchivio}";
+        const string FondoIndexUrl = AntenatiSite.root + "archive/?archivio={idArchivio}";
 
         public string description { get; set; }
         public string idArchivio { get; set; }
@@ -38,7 +38,7 @@ namespace viewer {
         }
 
         [JsonIgnore]
-        public string href { get { return $"https://antenati.cultura.gov.it/archive/?archivio={idArchivio}"; } }
+        public string href { get { return getIndexUrl(idArchivio); } }   // i fondi stanno nella pagina dell'archivio
 
         public static void Load(string filePath = FondiName) {
             // Leggi il contenuto del file JSON

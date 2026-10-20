@@ -27,9 +27,9 @@ Regex regex = new Regex(pattern);
         public static List<Serie> series = new List<Serie>();
         public static Dictionary<string, Serie> serieById = new Dictionary<string, Serie>();
 
-        const string SeriesIndexUrl = "https://antenati.cultura.gov.it/archive/?archivio={idArchivio}";
+        const string SeriesIndexUrl = AntenatiSite.root + "archive/?archivio={idArchivio}";
 
-        const string SeriesIndexUrl2 = "https://antenati.cultura.gov.it/search-registry/?localita={localita}";
+        const string SeriesIndexUrl2 = AntenatiSite.root + "search-registry/?localita={localita}";
         public static string getIndexUrl2(string idSerie) {
             return SeriesIndexUrl2.Replace("{localita}", Uri.EscapeDataString(Serie.serieById[idSerie].localita ?? Serie.serieById[idSerie].description));
         }
@@ -41,7 +41,7 @@ Regex regex = new Regex(pattern);
         public List <AnnoSerie> myAnnoSeries = new List<AnnoSerie>();
 
         [JsonIgnore]
-        public string href { get { return $"https://antenati.cultura.gov.it/search-registry/?serie={idSerie}"; } }
+        public string href { get { return $"{AntenatiSite.root}search-registry/?serie={idSerie}"; } }
 
         public string localita { get; set; }
 

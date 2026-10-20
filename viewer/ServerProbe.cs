@@ -20,7 +20,7 @@ namespace viewer {
     public static class ServerProbe {
 
         public class Options {
-            public string SiteUrl = "https://antenati.cultura.gov.it/";
+            public string SiteUrl = AntenatiSite.root;
             public string ManifestUrl;
             public IiifServer Iiif = IiifServer.current;
             /// <summary>larghezza richiesta dal programma (0 = full/max)</summary>

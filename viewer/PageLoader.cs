@@ -34,7 +34,7 @@ namespace viewer {
         /// </summary>
         public static Dictionary<string, string> hotlinkHeaders() {
             return new Dictionary<string, string> {
-                ["Referer"] = "https://antenati.cultura.gov.it",
+                ["Referer"] = AntenatiSite.origin,
                 ["Sec-Fetch-Site"] = "same-site",
             };
         }
@@ -46,7 +46,7 @@ namespace viewer {
         /// </summary>
         public static Dictionary<string, string> siteHeaders() {
             var h = hotlinkHeaders();
-            h["Origin"] = "https://antenati.cultura.gov.it";
+            h["Origin"] = AntenatiSite.origin;
             h["Accept"] = "*/*";
             h["Accept-Encoding"] = "gzip, deflate";
             h["Accept-Language"] = "it,en-US;q=0.9,en;q=0.8";
@@ -161,7 +161,7 @@ namespace viewer {
         }
 
         // Home di Antenati per il warm-up (modificabile solo dai test, per puntare a un server locale)
-        public static string warmUpUrl = "https://antenati.cultura.gov.it/";
+        public static string warmUpUrl = AntenatiSite.root;
 
         /// <summary>
         /// Attende la fine del warm-up: va chiamato da chi ha bisogno di PHPSESSID

@@ -27,12 +27,16 @@ namespace viewer {
         public static Dictionary<string, Registro> registroById = new Dictionary<string, Registro>();
         static string pureAnno(string anno) { return anno.Split('-')[0]; }
 
-        const string RegistroAddress = "https://antenati.cultura.gov.it/search-registry/?serie={idSerie}&s_facet_query=tipologia_ss%3A{kind}%252Canni_is%3A{anno}";
+        const string RegistroAddress = AntenatiSite.root + "search-registry/?serie={idSerie}&s_facet_query=tipologia_ss%3A{kind}%252Canni_is%3A{anno}";
 
 
-        const string RegistroAddress2 = "https://antenati.cultura.gov.it/search-registry/?localita={localita}&s_facet_query=tipologia_ss%3A{kind}%252anni_is%3A{anno}";
+        const string RegistroAddress2 = AntenatiSite.root + "search-registry/?localita={localita}&s_facet_query=tipologia_ss%3A{kind}%252anni_is%3A{anno}";
+
+        /// <summary>Inizio dell'indirizzo permanente (ark) di ogni registro</summary>
+        public const string arkPrefix = AntenatiSite.root + "ark:/12657/";
+
         [JsonIgnore]
-        public string href { get { return $"https://antenati.cultura.gov.it/ark:/12657/an_ua{idRegistro}"; } }
+        public string href { get { return $"{arkPrefix}an_ua{idRegistro}"; } }
 
         // Lettura nell'altro verso di href (+ "/codice pagina"): pagina incollata, redirect della ricerca, @id del manifest
         static readonly Regex hrefId = new Regex(@"an_ua(\d+)");

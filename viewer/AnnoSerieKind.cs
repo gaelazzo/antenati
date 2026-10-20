@@ -21,7 +21,7 @@ namespace viewer {
         public static List<AnnoSerieKind> annoSeriesKind = new List<AnnoSerieKind>();
         public static Dictionary<string, AnnoSerieKind> annoSerieKindById = new Dictionary<string, AnnoSerieKind>();
 
-        const string AnnoSeriesKindIndexUrl = "https://antenati.cultura.gov.it/search-registry/?serie={idSerie}&s_facet_query=anni_is%3A{anno}";
+        const string AnnoSeriesKindIndexUrl = AntenatiSite.root + "search-registry/?serie={idSerie}&s_facet_query=anni_is%3A{anno}";
         
 
         static string fixKind(string kind) {
@@ -31,7 +31,7 @@ namespace viewer {
         }
 
         [JsonIgnore]
-        public string href { get { return $"https://antenati.cultura.gov.it/search-registry/?serie={idSerie}&s_facet_query=tipologia_ss%3A{fixKind(kind)}%252Canni_is%3A{pureAnno(anno)}"; ; } }
+        public string href { get { return $"{AntenatiSite.root}search-registry/?serie={idSerie}&s_facet_query=tipologia_ss%3A{fixKind(kind)}%252Canni_is%3A{pureAnno(anno)}"; } }
       
         public string description { get; set; }
 

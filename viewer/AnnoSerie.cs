@@ -23,11 +23,11 @@ namespace viewer {
         public static List<AnnoSerie> annoSeries = new List<AnnoSerie>();
         public static Dictionary<string, AnnoSerie> annoSerieById = new Dictionary<string, AnnoSerie>();
 
-        const string AnnoSeriesIndexUrl = "https://antenati.cultura.gov.it/search-registry/?serie={idSerie}";
-        const string AnnoSeriesIndexUrl2 = "https://antenati.cultura.gov.it/search-registry/?localita={localita}&s_facet_query=anni_is%3A{anno}";
+        const string AnnoSeriesIndexUrl = AntenatiSite.root + "search-registry/?serie={idSerie}";
+        const string AnnoSeriesIndexUrl2 = AntenatiSite.root + "search-registry/?localita={localita}&s_facet_query=anni_is%3A{anno}";
 
         [JsonIgnore]
-        public string href { get { return $"https://antenati.cultura.gov.it/search-registry/?serie={idSerie}&s_facet_query=anni_is%3A{pureAnno(anno)}"; } }
+        public string href { get { return $"{AntenatiSite.root}search-registry/?serie={idSerie}&s_facet_query=anni_is%3A{pureAnno(anno)}"; } }
 
         public static string getIndexUrl2(string idSerie, string anno) {
             return AnnoSeriesIndexUrl2.Replace("{localita}", Uri.EscapeDataString(Serie.serieById[idSerie].localita ?? Serie.serieById[idSerie].description)).Replace("{anno}", pureAnno(anno));

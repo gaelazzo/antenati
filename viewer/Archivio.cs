@@ -21,12 +21,12 @@ namespace viewer {
         public static List<Archivio> archivi = new List<Archivio>();
         public static Dictionary<string, Archivio> archivioById = new Dictionary<string, Archivio>();
 
-        const string ArchivioIndexUrl= "https://antenati.cultura.gov.it/esplora-gli-archivi/";
+        const string ArchivioIndexUrl= AntenatiSite.root + "esplora-gli-archivi/";
         public string description { get; set; }
         public string idArchivio { get; set; }
 
         [JsonIgnore]
-        public string href { get { return $"https://antenati.cultura.gov.it/archive/?archivio={idArchivio}"; } }
+        public string href { get { return $"{AntenatiSite.root}archive/?archivio={idArchivio}"; } }
         
         [JsonIgnore]
         public tipoNodo tipo { get{ return tipoNodo.Archivio; } }
