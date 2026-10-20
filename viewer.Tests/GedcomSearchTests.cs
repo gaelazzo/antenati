@@ -1,182 +1,211 @@
-using Gedcom;
+using Newtonsoft.Json;
 using NUnit.Framework;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Windows.Forms;
 
 namespace viewer.Tests {
 
     /// <summary>
-    /// Ricerca nel GEDCOM con la sintassi della scheda di ricerca:
-    /// "Nome Cognome DI padre E DI madre marito di/moglie di coniuge".
+    /// Ricerca nel GEDCOM (GedcomSearch) con la sintassi della scheda di ricerca:
+    /// "Nome Cognome DI padre DI nonno E DI madre DI suo padre marito di/moglie di coniuge".
+    /// File di prova Fixtures\ricerca.ged:
+    ///   Antonio Rossi -> Michele Rossi (1790) x Maria Concetta Bianchi [1815] -> Giuseppe Rossi (1820-1880) x Anna Verdi (ABT 1825) [1845]
+    ///   figli di Giuseppe e Anna: Giovanni Del Vecchio (1846), Carmela Rossi (1848)
+    ///   Rosa Maria / Rosina Neri (1830, due nomi, famiglia senza padre) -> Luigi Neri x Carmela Rossi [20 OTT 1870]
+    ///   Giuseppe Esposito (senza famiglia), Giuseppe Rossi (1851, omonimo)
+    /// Gli identificativi XREF vengono rinumerati in lettura: le persone si riconoscono dagli anni.
     /// </summary>
-    [TestFixture, Apartment(System.Threading.ApartmentState.STA)]
+    [TestFixture]
     public class GedcomSearchTests {
-        // Michele Rossi x Maria Concetta Bianchi (1815) -> Giuseppe Rossi x Anna Verdi (1845)
-        // Antonio Rossi padre di Michele; Giuseppe Esposito senza famiglia; un secondo Giuseppe Rossi (I6, 1851) omonimo
-        // RIN = XRef originale: Gedcom.NET rinumera gli XRef in lettura e i nomi non bastano a distinguere le persone
-        const string Ged = @"0 HEAD
-1 SOUR test
-1 GEDC
-2 VERS 5.5
-2 FORM LINEAGE-LINKED
-1 CHAR UTF-8
-0 @I0@ INDI
-1 RIN I0
-1 NAME Antonio /Rossi/
-1 SEX M
-1 FAMS @F0@
-0 @I1@ INDI
-1 RIN I1
-1 NAME Michele /Rossi/
-1 SEX M
-1 BIRT
-2 DATE 1790
-1 FAMC @F0@
-1 FAMS @F1@
-0 @I2@ INDI
-1 RIN I2
-1 NAME Maria Concetta /Bianchi/
-1 SEX F
-1 FAMS @F1@
-0 @I3@ INDI
-1 RIN I3
-1 NAME Giuseppe /Rossi/
-1 SEX M
-1 BIRT
-2 DATE 12 MAR 1820
-1 DEAT
-2 DATE 1880
-1 FAMC @F1@
-1 FAMS @F2@
-0 @I4@ INDI
-1 RIN I4
-1 NAME Anna /Verdi/
-1 SEX F
-1 FAMS @F2@
-0 @I5@ INDI
-1 RIN I5
-1 NAME Giuseppe /Esposito/
-1 SEX M
-0 @I6@ INDI
-1 RIN I6
-1 NAME Giuseppe /Rossi/
-1 SEX M
-1 BIRT
-2 DATE 1851
-0 @F0@ FAM
-1 HUSB @I0@
-1 CHIL @I1@
-0 @F1@ FAM
-1 HUSB @I1@
-1 WIFE @I2@
-1 CHIL @I3@
-1 MARR
-2 DATE 1815
-0 @F2@ FAM
-1 HUSB @I3@
-1 WIFE @I4@
-1 MARR
-2 DATE 1845
-0 TRLR
-";
-        Viewer v;
+        GedcomSearch g;
+        static readonly DescriptionOptions conConiugi = new DescriptionOptions { ShowSpouse = true };
 
         [SetUp]
         public void SetUp() {
-            v = Priv.NewViewer();
-            foreach (var chk in new[] { "chkFullNames", "chkFullDate", "chkFullKey", "chkKeys", "chkShowSpouse" })
-                Priv.Set(v, chk, new CheckBox());
-            ((CheckBox)Priv.Get(v, "chkShowSpouse")).Checked = true;
-
-            string file = Path.Combine(Sandbox.NewDir(), "test.ged");
-            File.WriteAllText(file, Ged.Replace("\r\n", "\n").Replace("\n", "\r\n"), new UTF8Encoding(false));
-            Assert.That(Priv.Call<bool>(v, "readGedFile", file), Is.True);
+            g = GedcomSearch.Load(Path.Combine(Sandbox.FixturesDir, "ricerca.ged"));
+            Assert.That(g, Is.Not.Null);
         }
 
-        // Gedcom.NET rinumera gli XRef in lettura (@I3@ -> XREFn): l'identita' stabile e' il RIN
-        static string Id(GedcomIndividualRecord i) => i.AutomatedRecordID;
+        IReadOnlyList<string> Find(string q) => g.Search(q, conConiugi);
 
-        string[] Find(string mask) {
-            return Priv.Call<System.Collections.Generic.IEnumerable<GedcomIndividualRecord>>(v, "findIndividual", mask)
-                       .Select(Id).OrderBy(x => x).ToArray();
+        [Test]
+        public void FileNonValido_Null() {
+            string f = Path.Combine(Sandbox.NewDir(), "rotto.ged");
+            File.WriteAllText(f, "non e' un gedcom");
+            Assert.That(GedcomSearch.Load(f), Is.Null);
         }
 
-        GedcomIndividualRecord Person(string rin) {
-            return ((GedcomDatabase)Priv.Get(v, "database")).Individuals.Single(i => Id(i) == rin);
+        [Test]
+        public void NomeDelFile() {
+            Assert.That(g.FileName, Does.EndWith("ricerca.ged"));
         }
 
         [Test]
         public void NomeECognome_TrovaGliOmonimi() {
-            Assert.That(Find("Giuseppe Rossi"), Is.EqualTo(new[] { "I3", "I6" }));
-        }
-
-        [Test]
-        public void Omonimi_DistintiDalPadre() {
-            Assert.That(Find("Giuseppe Rossi DI Michele"), Is.EqualTo(new[] { "I3" }));
+            var r = Find("Giuseppe Rossi");
+            Assert.That(r.Count, Is.EqualTo(2));
+            Assert.That(r, Has.One.StartsWith("Giuseppe Rossi(1820-1880)"));
+            Assert.That(r, Has.One.EqualTo("Giuseppe Rossi(1851)"));
         }
 
         [Test]
         public void CognomeENomeInvertiti() {
-            Assert.That(Find("Rossi Giuseppe"), Is.EqualTo(new[] { "I3", "I6" }));
+            Assert.That(Find("Rossi Giuseppe"), Is.EquivalentTo(Find("Giuseppe Rossi")));
         }
 
         [Test]
-        public void ConPadre() {
-            Assert.That(Find("Giuseppe Rossi DI Michele"), Is.EqualTo(new[] { "I3" }));
+        public void ConPadre_DistingueGliOmonimi() {
+            Assert.That(Find("Giuseppe Rossi DI Michele").Single(), Does.StartWith("Giuseppe Rossi(1820-1880)"));
             Assert.That(Find("Giuseppe Rossi DI Antonio"), Is.Empty);
         }
 
         [Test]
         public void ConNonnoPaterno() {
-            Assert.That(Find("Giuseppe Rossi DI Michele DI Antonio"), Is.EqualTo(new[] { "I3" }));
+            Assert.That(Find("Giuseppe Rossi DI Michele DI Antonio").Count, Is.EqualTo(1));
             Assert.That(Find("Giuseppe Rossi DI Michele DI Pasquale"), Is.Empty);
         }
 
         [Test]
         public void ConMadre() {
-            Assert.That(Find("Giuseppe Rossi DI Michele E DI Maria Concetta Bianchi"), Is.EqualTo(new[] { "I3" }));
+            Assert.That(Find("Giuseppe Rossi DI Michele E DI Maria Concetta Bianchi").Count, Is.EqualTo(1));
             Assert.That(Find("Giuseppe Rossi DI Michele E DI Anna Verdi"), Is.Empty);
         }
 
         [Test]
         public void ConConiuge() {
-            Assert.That(Find("Giuseppe Rossi marito di Anna Verdi"), Is.EqualTo(new[] { "I3" }));
-            Assert.That(Find("Anna Verdi moglie di Giuseppe Rossi"), Is.EqualTo(new[] { "I4" }));
+            Assert.That(Find("Giuseppe Rossi marito di Anna Verdi").Single(), Does.StartWith("Giuseppe Rossi(1820-1880)"));
+            Assert.That(Find("Anna Verdi moglie di Giuseppe Rossi").Single(), Does.StartWith("Anna Verdi(1825)"));
             Assert.That(Find("Giuseppe Esposito marito di Anna Verdi"), Is.Empty);
         }
 
         [Test]
         public void CognomeSconosciuto_ConPadre() {
-            Assert.That(Find("Giuseppe ? DI Michele"), Is.EqualTo(new[] { "I3" }));
+            Assert.That(Find("Giuseppe ? DI Michele").Single(), Does.StartWith("Giuseppe Rossi(1820-1880)"));
+        }
+
+        [Test]
+        public void CognomeConPrefisso() {
+            Assert.That(Find("Giovanni Del Vecchio").Single(), Does.StartWith("Giovanni Del Vecchio(1846)"));
+        }
+
+        [Test]
+        public void MadreSenzaPadreNellaFamiglia() {
+            Assert.That(Find("Luigi Neri").Single(), Does.StartWith("Luigi Neri DI Rosa Neri(1830)"));
         }
 
         [Test]
         public void DescrizioneBreve() {
-            var indi = Person("I3");
-            Assert.That(Priv.Call<string>(v, "getSimpleDescr", indi),
-                Is.EqualTo("Giuseppe Rossi(1820-1880) DI Michele(1790) E DI Maria Bianchi[1815], marito di Anna Verdi[1845]"));
+            Assert.That(Find("Giuseppe Rossi DI Michele").Single(),
+                Is.EqualTo("Giuseppe Rossi(1820-1880) DI Michele(1790) E DI Maria Bianchi[1815], marito di Anna Verdi(1825)[1845]"));
         }
 
         [Test]
-        public void DescrizioneBreve_DateENomiCompleti() {
-            ((CheckBox)Priv.Get(v, "chkFullDate")).Checked = true;
-            ((CheckBox)Priv.Get(v, "chkFullNames")).Checked = true;
-            ((CheckBox)Priv.Get(v, "chkKeys")).Checked = true;
-            var indi = Person("I3");
-            string s = Priv.Call<string>(v, "getSimpleDescr", indi);
-
-            Assert.That(s, Does.StartWith(indi.XRefID + " Giuseppe Rossi(12 MAR 1820-1880)"));
+        public void DescrizioneBreve_DateNomiEIdentificativo() {
+            var o = new DescriptionOptions { ShowSpouse = true, FullDates = true, FullNames = true, ShowKey = true };
+            string s = g.Search("Giuseppe Rossi DI Michele", o).Single();
+            Assert.That(s, Does.Match(@"^XREF\d+ Giuseppe Rossi\(12 MAR 1820-1880\)"));
             Assert.That(s, Does.Contain("E DI Maria Concetta Bianchi"));
         }
 
         [Test]
-        public void Figli() {
-            var indi = Person("I1");
-            string s = Priv.Call<string>(v, "children", indi);
+        public void SenzaConiugi_NonLiMostra() {
+            Assert.That(g.Search("Giuseppe Rossi DI Michele", new DescriptionOptions()).Single(), Does.Not.Contain("marito di"));
+        }
+
+        [Test]
+        public void Scheda_FigliEConiugi() {
+            string id = IdOf("Michele Rossi");
+            string s = g.Describe(id, conConiugi);
             Assert.That(s, Does.Contain("with Maria Bianchi:"));
-            Assert.That(s, Does.Contain("Giuseppe Rossi(1820-1880), marito di Anna Verdi married in 1845"));
+            Assert.That(s, Does.Contain("Giuseppe Rossi(1820-1880), marito di Anna Verdi(1825) married in 1845"));
+        }
+
+        [TestCase("")]
+        [TestCase("   ")]
+        [TestCase(null)]
+        [TestCase("XREF99999")]
+        public void Scheda_IdVuotoOInesistente_Null(string id) {
+            Assert.That(g.Describe(id, conConiugi), Is.Null);
+        }
+
+        [Test]
+        public void Scheda_IdConOSenzaPrefisso() {
+            // la scheda accetta l'identificativo con o senza "XREF" (prima lo aggiungeva il Viewer)
+            string id = IdOf("Michele Rossi");
+            string num = id.Substring(4);
+            Assert.That(g.Describe(num, conConiugi), Is.EqualTo(g.Describe(id, conConiugi)));
+            Assert.That(g.Describe(" " + num + " ", conConiugi), Is.EqualTo(g.Describe(id, conConiugi)));
+        }
+
+        string IdOf(string query) =>
+            g.Search(query, new DescriptionOptions { ShowKey = true }).Single().Split(' ')[0];
+
+        // ---------- regole sui nomi ----------
+
+        [TestCase("12 MAR 1820", "1820")]
+        [TestCase("ABT 1790", "1790")]
+        [TestCase("1813", "1813")]
+        [TestCase("", "")]
+        [TestCase(null, "")]
+        public void Anno(string date, string expected) {
+            Assert.That(Priv.Call<string>(typeof(GedcomSearch), "getYear", date), Is.EqualTo(expected));
+        }
+
+        [TestCase("De", true)]
+        [TestCase("di", true)]
+        [TestCase("Del", true)]
+        [TestCase("Rossi", false)]
+        [TestCase("Ann", false)]
+        [TestCase("", false)]
+        public void Prefisso(string s, bool expected) {
+            Assert.That(Priv.Call<bool>(typeof(GedcomSearch), "isPrefix", s), Is.EqualTo(expected));
+        }
+
+        [TestCase("Giuseppe Rossi", "Giuseppe", "Rossi")]
+        [TestCase("Maria Concetta Bianchi", "Maria Concetta", "Bianchi")]
+        [TestCase("Maria De Rosa", "Maria", "De Rosa")]
+        [TestCase("Giovanni Del Vecchio", "Giovanni", "Del Vecchio")]
+        [TestCase("? Rossi", "?", "Rossi")]
+        [TestCase("Giuseppe ?", "Giuseppe", "?")]
+        [TestCase("Rossi", "?", "Rossi")]
+        [TestCase("  Giuseppe Rossi  ", "Giuseppe", "Rossi")]
+        public void NomiECognome(string s, string names, string surname) {
+            Assert.That(Priv.Call<string>(typeof(GedcomSearch), "getNames", s), Is.EqualTo(names));
+            Assert.That(Priv.Call<string>(typeof(GedcomSearch), "getSurname", s), Is.EqualTo(surname));
+        }
+
+        [Test]
+        public void NomiECognome_Null() {
+            Assert.That(Priv.Call(typeof(GedcomSearch), "getNames", (string)null), Is.Null);
+            Assert.That(Priv.Call(typeof(GedcomSearch), "getSurname", (string)null), Is.Null);
+        }
+
+        // ---------- riferimento: comportamento identico al codice prima dello spostamento ----------
+
+        /// <summary>
+        /// Fixtures\ricerca.golden.json: ricerche e schede su ricerca.ged con tutte le 32 combinazioni
+        /// delle opzioni, prodotte dal codice che stava in Viewer (verificate identiche, 0 differenze su
+        /// 1888 voci, il 20/10/2026). Chiave: "S|bit|ricerca" o "D|bit|id"; bit: FullNames=1, FullDates=2,
+        /// ShowSpouse=4, ShowKey=8, ShowAllKeys=16. Righe della ricerca separate da "\n"; null = nessuna scheda.
+        /// </summary>
+        [Test]
+        public void Riferimento_IdenticoAlComportamentoPrecedente() {
+            var gold = JsonConvert.DeserializeObject<Dictionary<string, string>>(
+                File.ReadAllText(Path.Combine(Sandbox.FixturesDir, "ricerca.golden.json")));
+            Assert.That(gold.Count, Is.EqualTo(1888));
+            var diffs = new List<string>();
+            foreach (var kv in gold) {
+                var p = kv.Key.Split(new[] { '|' }, 3);
+                int b = int.Parse(p[1]);
+                var o = new DescriptionOptions {
+                    FullNames = (b & 1) != 0, FullDates = (b & 2) != 0, ShowSpouse = (b & 4) != 0, ShowKey = (b & 8) != 0, ShowAllKeys = (b & 16) != 0,
+                };
+                string actual = p[0] == "S" ? string.Join("\n", g.Search(p[2], o)) : g.Describe(p[2], o);
+                if (actual != kv.Value)
+                    diffs.Add(kv.Key);
+            }
+            Assert.That(diffs, Is.Empty, "voci diverse dal riferimento: " + string.Join(", ", diffs.Take(10)));
         }
     }
 }

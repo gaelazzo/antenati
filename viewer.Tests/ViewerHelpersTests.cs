@@ -90,15 +90,6 @@ namespace viewer.Tests {
             Assert.That(Priv.Call<bool>(v, "extractDate", args), Is.False);
         }
 
-        [TestCase("12 MAR 1820", "1820")]
-        [TestCase("ABT 1790", "1790")]
-        [TestCase("1813", "1813")]
-        [TestCase("", "")]
-        [TestCase(null, "")]
-        public void GetYear(string date, string expected) {
-            Assert.That(Priv.Call<string>(v, "getYear", date), Is.EqualTo(expected));
-        }
-
         [Test]
         public void ParseFirstDate_UnaSolaCopia_QuellaDelTree() {
             // c'erano due copie (Viewer e RegNode) da tenere allineate; ora "Riordina nomi" del Viewer
@@ -108,36 +99,6 @@ namespace viewer.Tests {
             Assert.That(typeof(RegNode).GetMethod("ParseFirstDate", all), Is.Not.Null);
         }
 
-        // ---------- Nomi e cognomi (ricerca GEDCOM) ----------
-
-        [TestCase("De", true)]
-        [TestCase("di", true)]
-        [TestCase("Del", true)]
-        [TestCase("Rossi", false)]
-        [TestCase("Ann", false)]
-        [TestCase("", false)]
-        public void IsPrefix(string s, bool expected) {
-            Assert.That(Priv.Call<bool>(v, "isPrefix", s), Is.EqualTo(expected));
-        }
-
-        [TestCase("Giuseppe Rossi", "Giuseppe", "Rossi")]
-        [TestCase("Maria Concetta Bianchi", "Maria Concetta", "Bianchi")]
-        [TestCase("Maria De Rosa", "Maria", "De Rosa")]
-        [TestCase("Giovanni Del Vecchio", "Giovanni", "Del Vecchio")]
-        [TestCase("? Rossi", "?", "Rossi")]
-        [TestCase("Giuseppe ?", "Giuseppe", "?")]
-        [TestCase("Rossi", "?", "Rossi")]
-        [TestCase("  Giuseppe Rossi  ", "Giuseppe", "Rossi")]
-        public void NomiECognome(string s, string names, string surname) {
-            Assert.That(Priv.Call<string>(v, "getNames", s), Is.EqualTo(names));
-            Assert.That(Priv.Call<string>(v, "getSurname", s), Is.EqualTo(surname));
-        }
-
-        [Test]
-        public void NomiECognome_Null() {
-            Assert.That(Priv.Call(v, "getNames", (string)null), Is.Null);
-            Assert.That(Priv.Call(v, "getSurname", (string)null), Is.Null);
-        }
 
         // ---------- Appunti (appunti.txt, appuntiCitta.txt, famiglieCitta.txt) ----------
 
