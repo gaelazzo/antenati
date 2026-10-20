@@ -34,6 +34,22 @@ namespace viewer {
         [JsonIgnore]
         public string href { get { return $"https://antenati.cultura.gov.it/ark:/12657/an_ua{idRegistro}"; } }
 
+        // Lettura nell'altro verso di href (+ "/codice pagina"): pagina incollata, redirect della ricerca, @id del manifest
+        static readonly Regex hrefId = new Regex(@"an_ua(\d+)");
+        static readonly Regex hrefPage = new Regex(@"an_ua\d+/([^/?#\s]+)");
+
+        /// <summary>Codice del registro in un indirizzo ".../an_ua{id}...", null se non c'e'</summary>
+        public static string idFromHref(string url) {
+            var m = hrefId.Match(url ?? "");
+            return m.Success ? m.Groups[1].Value : null;
+        }
+
+        /// <summary>Codice della pagina in un indirizzo ".../an_ua{id}/{codice}", null se non c'e'</summary>
+        public static string pageCodeFromHref(string url) {
+            var m = hrefPage.Match(url ?? "");
+            return m.Success ? m.Groups[1].Value : null;
+        }
+
         [JsonIgnore]
         public string idSerieAnnoKind { get { return idSerie + "/" + anno + "/" + kind; } }
 
@@ -195,10 +211,8 @@ namespace viewer {
         }
         public static List<IArchiveNode> deriveRegistroFromPage(string anno, string idSerie,string kind, string url) {
             List<IArchiveNode> res = new List<IArchiveNode>();
-            string mask = @"an_ua(\d+)";
-            Match match = Regex.Match(url, mask);
-            if (match.Success) {
-                string idRegistro = match.Groups[1].Value; // Estrarre il codice
+            string idRegistro = idFromHref(url);
+            if (idRegistro != null) {
                 string segnaturaAttuale = "unico";
                 res.Add(findOrCreate(anno, idSerie, kind, idRegistro, segnaturaAttuale));
                 return res;

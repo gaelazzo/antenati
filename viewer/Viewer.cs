@@ -3453,26 +3453,19 @@ namespace viewer {
         }
 
         private void btnGotoRegister_Click(object sender, EventArgs e) {
-            string pattern = @"an_ua(\d+)";
-
-            Match match = Regex.Match(txtWebAddress.Text, pattern);
-            if (match.Success) {
-                string codice = match.Groups[1].Value;
-                var idRegistro = codice;
-                if (idRegistro != null) {
-                    // come in decodeUrl: registro non ancora nell'albero
-                    if (!Registro.registroById.ContainsKey(idRegistro)) {
-                        MessageBox.Show("Manca il registro " + idRegistro + ", lo copio nel codice registro.");
-                        txtCodiceRegistro.Text = idRegistro;
-                        return;
-                    }
-                    setRegister(idRegistro);
-                    var nn = RegNode.addArchiveNodeToTree(Registro.registroById[idRegistro], treeMain.Nodes);
-                    if (nn != null) {
-                        nn.EnsureVisible();
-                        treeMain.SelectedNode = nn;
-                    }
-                }
+            var idRegistro = Registro.idFromHref(txtWebAddress.Text);
+            if (idRegistro == null) return;
+            // come in decodeUrl: registro non ancora nell'albero
+            if (!Registro.registroById.ContainsKey(idRegistro)) {
+                MessageBox.Show("Manca il registro " + idRegistro + ", lo copio nel codice registro.");
+                txtCodiceRegistro.Text = idRegistro;
+                return;
+            }
+            setRegister(idRegistro);
+            var nn = RegNode.addArchiveNodeToTree(Registro.registroById[idRegistro], treeMain.Nodes);
+            if (nn != null) {
+                nn.EnsureVisible();
+                treeMain.SelectedNode = nn;
             }
         }
 
@@ -3627,9 +3620,9 @@ namespace viewer {
             url = redirectUrl(url);
             if (url.StartsWith("https://antenati.cultura.gov.it/ark:/12657/")) {
                 //https://antenati.cultura.gov.it/ark:/12657/an_ua17439642/wbOG7kv
-                var parts = url.Split('/');
-                if (parts.Length > 5) {
-                    idRegistro = parts[5].Substring(5);
+                string id = Registro.idFromHref(url);
+                if (id != null) {
+                    idRegistro = id;
                     if (!Registro.registroById.ContainsKey(idRegistro)) {
                         MessageBox.Show("Manca il registro " + idRegistro + ", lo copio nel codice registro.");
                         txtCodiceRegistro.Text = idRegistro;
@@ -3639,8 +3632,9 @@ namespace viewer {
                     urlRequested = url;
                     toMarkImportant = true;
                     gotoRegister(idRegistro);
-                    if (parts.Length >= 7) {
-                        goToCode(parts[6], false);
+                    string pageCode = Registro.pageCodeFromHref(url);
+                    if (pageCode != null) {
+                        goToCode(pageCode, false);
                     }
                 }
             }

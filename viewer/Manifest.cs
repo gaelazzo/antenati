@@ -168,14 +168,13 @@ namespace viewer {
                     string idImage = (string)canvas["@id"];
                     
 
-					var pieces = idImage.Split('/');
-
                     //m.width = canvas["width"]?.ToString();
                     //m.height = canvas["height"]?.ToString();
 
-					var idRegistro =pieces[5];
-                    m.idRegistro = idRegistro.Substring(5);
-                    var imageCode = pieces[6];
+                    m.idRegistro = Registro.idFromHref(idImage);
+                    var imageCode = Registro.pageCodeFromHref(idImage);
+                    if (m.idRegistro == null || imageCode == null)
+                        throw new InvalidDataException($"Pagina {pageNumber} del manifest: @id inatteso \"{idImage}\"");
 
                     mapPage[pageNumber] = imageCode;
 					imageIds.Add(imageCode);
