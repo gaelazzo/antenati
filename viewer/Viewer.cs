@@ -3385,14 +3385,14 @@ namespace viewer {
         void reloadImage() {
             int n = getNum();
             // Load image asynchronously to avoid blocking UI thread during zoom changes
-            viewImage(n); 
+            _ = viewImage(n, chkContrast.Checked, contrastBar.Value);
         }
 
 		/// <summary>
 		/// Carica e visualizza l'immagine n-esima con la dimensione corrente
 		/// </summary>
 		/// <param name="n"></param>
-		async Task viewImage(int n) {
+		async Task viewImage(int n, bool contrastOn, int contrastLevel) {
             if (n == 0) {
                 return;
             }
@@ -3402,33 +3402,44 @@ namespace viewer {
             }
             var bmp = LoadBitmapUnlocked(fPath);
             if (bmp == null) return;
-            if (chkContrast.Checked)
-                processImage(bmp, contrastBar.Value);
+            if (contrastOn)
+                processImage(bmp, contrastLevel);
             imageToDisplayNum = n;   // scritto PRIMA
             imageToDisplay = bmp;    // pubblicato per ULTIMO
             //displayImage(imageToDisplay);
             //pic.Refresh();
         }
 
-        async Task reContrast() {
-            int n = getNum();
-            await viewImage(n);
+        /// <summary>
+        /// Ricarica la pagina n (col contrasto attuale) e aspetta che sia pronta: la finestra resta in
+        /// attesa come prima. Il download gira fuori dal thread della finestra: aspettarlo con
+        /// GetAwaiter().GetResult() da qui, con le sue continuation che volevano tornare proprio su
+        /// questo thread, bloccava la finestra per sempre quando la pagina non era in cache.
+        /// I valori dei controlli si leggono qui, sul thread della finestra.
+        /// </summary>
+        void viewImageAndWait(int n) {
+            bool contrastOn = chkContrast.Checked;
+            int contrastLevel = contrastBar.Value;
+            Task.Run(() => viewImage(n, contrastOn, contrastLevel)).GetAwaiter().GetResult();
+        }
 
+        void reContrast() {
+            viewImageAndWait(getNum());
         }
         private void btnLessContrast_Click(object sender, EventArgs e) {
             if (contrastBar.Value > 10)
                 contrastBar.Value -= 2;
-            reContrast().GetAwaiter().GetResult();
+            reContrast();
         }
 
         private void btnMoreContrast_Click(object sender, EventArgs e) {
             if (contrastBar.Value < 245)
                 contrastBar.Value += 2;
-            reContrast().GetAwaiter().GetResult();
+            reContrast();
         }
 
         private void chkContrast_CheckedChanged(object sender, EventArgs e) {
-            reContrast().GetAwaiter().GetResult();
+            reContrast();
         }
 
         private void contrastBar_ValueChanged(object sender, EventArgs e) {
@@ -3672,7 +3683,7 @@ namespace viewer {
 
         private void btnReset_Click(object sender, EventArgs e) {
             btnReset.Visible = false;
-            viewImage(currentImage).GetAwaiter().GetResult();
+            viewImageAndWait(currentImage);
             btnReset.Visible = true;
         }
 

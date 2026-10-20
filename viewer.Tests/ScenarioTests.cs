@@ -78,9 +78,17 @@ namespace viewer.Tests {
         }
 
         public void Dispose() {
-            try { if (V != null && !V.IsDisposed) V.Invoke(new Action(V.Close)); } catch { }
+            // BeginInvoke, non Invoke: se il thread della finestra e' bloccato (test che lo verifica)
+            // la chiusura non deve restare appesa; il thread e' di background e muore col processo
+            try { if (V != null && !V.IsDisposed) V.BeginInvoke(new Action(V.Close)); } catch { }
             ui.Join(10000);
         }
+
+        /// <summary>
+        /// Esegue azione sul thread della finestra e dice se e' tornata entro ms
+        /// (false = finestra bloccata)
+        /// </summary>
+        public bool RunOnUi(Action action, int ms) => V.BeginInvoke(action).AsyncWaitHandle.WaitOne(ms);
     }
 
     /// <summary>
@@ -257,6 +265,36 @@ namespace viewer.Tests {
             host.OpenRegister(R1);
             host.WaitUntil(() => host.Get(() => (string)Priv.Get(host.V, "idRegistro")) == R1 && host.Shown == 4, 10000, "R1 riaperto a pagina 4");
             Assert.That(host.PageBox, Is.EqualTo("4"));
+        }
+
+        [Test]
+        public void Contrasto_SuPaginaNonInCache_NonBloccaLaFinestra() {
+            // Il gestore aspetta il download con GetAwaiter().GetResult() sul thread della finestra; il
+            // download, dopo un await, vuole tornare proprio su quel thread: attesa circolare, finestra
+            // bloccata per sempre. Succedeva solo con la pagina non in cache.
+            delayMs[Code(R1, 7)] = 1000;
+            Start(R1, 1);
+            host.WaitUntil(() => host.Shown == 1, 10000, "pagina 1");
+            bool returned = host.RunOnUi(() => {
+                ((TextBox)Priv.Get(host.V, "txtPageNum")).Text = "7";
+                Priv.Call(host.V, "btnMoreContrast_Click", null, EventArgs.Empty);
+            }, 8000);
+            Assert.That(returned, Is.True, "finestra bloccata dal contrasto su pagina non in cache");
+            host.WaitUntil(() => host.Shown == 7, 10000, "pagina 7 a video");
+        }
+
+        [Test]
+        public void Reset_SuPaginaNonInCache_NonBloccaLaFinestra() {
+            delayMs[Code(R1, 8)] = 1000;
+            Start(R1, 1);
+            host.WaitUntil(() => host.Shown == 1, 10000, "pagina 1");
+            bool returned = host.RunOnUi(() => {
+                ((TextBox)Priv.Get(host.V, "txtPageNum")).Text = "8";
+                Priv.Set(host.V, "currentImage", 8);
+                Priv.Call(host.V, "btnReset_Click", null, EventArgs.Empty);
+            }, 8000);
+            Assert.That(returned, Is.True, "finestra bloccata dal Reset su pagina non in cache");
+            host.WaitUntil(() => host.Shown == 8, 10000, "pagina 8 a video");
         }
 
         [Test]
